@@ -1,0 +1,653 @@
+---
+name: youtube-script
+description: >
+  Write entertaining, conversational YouTube video scripts for documentary and
+  explainer content — why humans are the way they are, evolutionary origins,
+  ancient humans, unusual history, bizarre people, animals, survival, science,
+  disasters, human behavior. Writes the script itself (story, structure, voice,
+  jokes, evidence) for a narrated channel voiced with VibeVoice; the
+  video-production-format skill then packages it for production. Use this
+  skill whenever the user asks for a video script, a YouTube script, narration,
+  a voiceover script, a video outline, beat map or treatment, or wants a topic
+  turned into something watchable. Also use it to rewrite, punch up, tighten,
+  shorten, fact-check or de-robotize an existing script. Use it even if they
+  only say "write a video about X" or "make this into a video."
+---
+
+# YouTube Script Writing
+
+## The one thing that matters
+
+**The goal is not to deliver information. The goal is to make the viewer want to hear the next sentence.**
+
+Every paragraph earns its place or gets cut. A fact belongs in the script only if it does at least one of: advance the story, raise the stakes, open a question, create a visual, set up a joke, or pay something off. A fact that is merely true is not a reason to keep it.
+
+Here is the same content written four ways. The difference is the whole job:
+
+- **Correct:** "Radium was used in watch dial paint in the early twentieth century, which resulted in significant health consequences for factory workers."
+- **Informative:** "Factory workers painted watch dials with radium paint. They shaped their brushes with their lips, ingesting radium with every stroke, which caused severe bone damage."
+- **Entertaining:** "The company told them to point the brushes with their lips. Dip, lick, paint. All day. The girls thought this was great, because the paint made their teeth glow."
+- **Compelling:** "The company told them to point the brushes with their lips. Dip, lick, paint, all day, and management assured everyone it was perfectly safe. Some of the girls started doing it on purpose after hours — painting their nails with it, their buttons, their teeth, so they'd glow on the walk home. Then the jaws started coming apart."
+
+Same facts. The fourth one makes you need the next sentence. That's the bar.
+
+---
+
+## Channel profile (default)
+
+Unless the user says the script is for a different channel, write for this one. If it is for a different channel, keep all the craft below and drop only this section's specifics.
+
+**Niche.** Human-curiosity explainers: *why you are the way you are, told through the humans who came before you.* The viewer's own everyday experience is always the entry point; the ancestors are the explanation.
+
+**Format.** Narration over fast-changing images and short image-to-video animations. The art style is chosen by the user at generation time, so never write a visual note that depends on one style. Night scenes are dark with one warm light; diagrams sit on a plain light background. Signature device: **the ancestor-as-shadow**. The modern figure's shadow on the wall is a Stone Age ancestor in the same pose, the only warm-coloured thing in the frame, with rough wild hair and a spear, no face detail, no pelts or clothing. Every video uses it.
+
+**Narrator.** One calm documentary voice: dry, reflective, slightly deadpan, quietly amused. Never shouts, never gasps, never hypes. Jokes are delivered at exactly the volume of facts — the humour lives in word choice, understatement and timing, in the tradition of Sam O'Nella's dry delivery, not in energy. The narrator is not a psychologist and never claims or implies expertise; he reports what researchers found.
+
+**Length and pace.** Default 10 minutes. The narrator is the user's existing VibeVoice voice. Word budgets use `NARRATOR_WPM`: the measured value if the user has given one, otherwise **170 words per minute** (the launch-decision pace). At 170, 10 minutes ≈ **1,700 spoken words**, ≈ 140 sentences.
+
+**Structure rhythm.** Open on the viewer's modern moment → rewind to the ancestor → first evidence payoff by about 1:45–2:00 → end on a reflective line plus one short comment prompt.
+
+**Series rules.**
+- Never "Part 2" of the same list. Each new video changes the topic *and* the structure (a list video, then a single-question narrative, etc.).
+- Never reuse a competitor's wording, signature lines, character design or palette. If a line resembles a known channel's opener, rewrite it.
+- Language is adult (not kids' content) but clean by default — see Profanity.
+
+---
+
+## Step 1: Pick a mode and commit
+
+There are three narration modes. They use different tools and fail in different ways. Pick one before writing a word.
+
+### Mode C — The Inheritance (channel default)
+
+Second person for the present, third person for the past. Every segment runs **You → Them → You**: the viewer's modern moment ("you flinch at a door slamming"), the ancestral situation that made that reaction useful (shown in shadow), then back to the viewer with the reaction explained — still useful, or badly out of date.
+
+**Use when:** the question is about the viewer's own body, mind or habits: fears, sleep, food cravings, boredom, jealousy, loneliness, intelligence.
+
+**Rules:**
+- The "you" is always a specific, ordinary moment — a dark bedroom, a house spider on the ceiling, a quiet room when you're about to present — never "you, a human being, experience fear."
+- The ancestor is "your ancestor," "someone who lived fifty thousand years ago," or a character in a cutaway. Never a named individual, never a claim about what one specific prehistoric person thought.
+- Each return to "you" must land differently from the last (still useful / useless / actively harmful / funny-useless). If every return is "and that's why you still do it," the segments have become stamps.
+
+### Mode A — The Irreverent Lecturer
+
+Third person. A narrator with a personality tells you about something, interrupting himself constantly.
+
+**Use when:** the subject is an event, a disaster, a system, or a person the viewer watches from the outside. Biographies, historical incidents, "how did this happen." Use when in doubt on non-channel topics.
+
+### Mode B — The Immersive Life-Cycle
+
+Second person, present tense, throughout. The viewer *is* the subject and lives through it.
+
+**Use when:** the subject has a life or situation the viewer can occupy — an animal's lifespan, a historical occupation, a survival scenario. "How did ancient humans survive a winter?" can be Mode B.
+
+**Don't force it.** If you have to strain to make "you" work ("you are a molecule and you are feeling compressed"), use Mode A.
+
+**Legal blends:** Mode A may contain one bounded second-person set piece. Mode C already blends by design; don't add a third register on top.
+
+---
+
+## Step 2: Write the hook
+
+The premise is live within the first fifteen seconds — about **40 words** at 170 wpm. Not the topic, the *premise*. The topic is "fear." The premise is "your brain is still running Stone Age settings, and here is the proof."
+
+Never open with:
+
+> Today we're going to talk about... / Have you ever wondered... / In this video, we'll explore... / Picture this. / Throughout history, humans have always...
+
+### Channel cold open (Mode C)
+
+| Time | Job | Example (Video #1) |
+|---|---|---|
+| 0–5 s | The viewer's own moment of the thing, concrete and recent | "Last night, a sound in the dark made your heart jump. There was nothing there." |
+| 5–15 s | The shadow reveal — the ancestor behind the reaction — and the premise | "Your brain wasn't broken. It was doing exactly what it was built for, in a world your ancestors lived in for hundreds of thousands of years." |
+| 15–30 s | A rapid three-item preview and the promise the video will pay | "Every fear on this list once kept someone alive. By the end, you'll know which ones you inherited — and which one is quietly running your life." |
+| by ~1:45–2:00 | First hard evidence payoff: a named study, a number, a twist | The lion-attack study in the dark segment |
+
+The first evidence payoff is not optional. Up to that point the viewer is running on the promise; the study is where they decide you're worth trusting for ten minutes.
+
+### Other hook shapes (Modes A and B, or for variety)
+
+**The demolished assumption.** Name what the viewer believes, then knock it over.
+> Lighthouse keeping sounds like the perfect job for people who hate people. It was — in the same way solitary confinement is technically alone time.
+
+**The impossible fact, stated flatly.**
+> In 1518 a woman walked into a street in Strasbourg and started dancing. Within weeks, dozens of people had joined her.
+
+**The immediate predicament.** Mode B's default.
+> You hatch in total darkness two thousand feet down, already starving, and the only useful skill you were born with is the ability to smell a female and bite her.
+
+**The contradiction.**
+> The most glamorous, best-paying job available to a young woman in 1922 mostly involved painting tiny numbers on watch faces. It also dissolved her jaw.
+
+**The absurd hypothetical.**
+> Imagine losing a war to an enemy with no weapons, no strategy, no leadership, and no particular interest in fighting you.
+
+Whatever shape you pick, the second beat is already moving. Don't hook and then explain the hook.
+
+---
+
+## Step 3: Build the beat map before drafting
+
+Write the script as a journey, not a list — *even when it is a list video.* Pick a spine:
+
+- **Birth → growth → peak → decline → death.** Mode B default.
+- **Expectation → reality → escalating problems → final consequence.** "Why it sucked to be a ___."
+- **Question → investigation → increasingly bizarre findings → conclusion.** Single-question videos ("How did ancient humans sleep?").
+- **Setup → problem → attempted fix → worse problem → escalation → outcome.** Disasters and institutional stupidity.
+- **One rule → N cases ordered by how badly the rule now misfires → the worst misfire → the viewer.** Mode C list videos.
+
+For each beat, write down four things:
+
+1. What it does structurally
+2. The new information it delivers
+3. Its payoff
+4. The question it leaves open
+
+If two consecutive beats have the same structural function, one is dead weight. If a beat has no line 4, the viewer has no reason to stay.
+
+**Choose the ending shape now, not later** (Step 10).
+
+### List videos (e.g. "ten fears")
+
+A list is the riskiest structure in this style: ten segments want to become ten identical stamps. Rules:
+
+- **One rule behind all of them, stated early.** Video #1 uses the smoke-detector principle (Nesse): a false alarm costs a moment, a missed alarm costs your life, so evolution built alarms that go off too often. Every segment is then a case of that one rule — which is what turns a list into a story.
+- **One recurring visual device** that each segment updates (Video #1: an "alarm meter" showing how useful the fear was then vs now). The device is the thread the viewer follows between segments.
+- **Order by escalating misfire, not by importance.** Still useful → mostly useful → overkill → absurd → actively harmful. The last-but-one segment is the most out-of-date; the payoff is the fear that is out of date *and still wins*.
+- **Budget per segment:** at 170 wpm, a 45-second segment is ~125 words. Ten segments ≈ 1,250 words, leaving ~450 for cold open, rule, payoff and ending.
+- **Segment template, applied loosely:** name card → the modern moment → the ancestral moment (in shadow) → one named study or piece of evidence → one visual joke → the meter, then vs now. **Rotate the order and weight** of these parts; no two consecutive segments may open the same way. Some segments lead with the study, some with the joke, one can be almost entirely a cutaway.
+- **Connect segments causally where you can** ("Heights were a problem you could see. Deep water was the one you couldn't.") — Step 10 transitions apply.
+- **Pay the title's promise explicitly.** If the title says "things that can't hurt you," the script must admit plainly that some snakes and spiders *can* hurt you, then focus on the everyday cases (the house spider, the dark bedroom) where the alarm misfires.
+
+---
+
+## Step 4: Curiosity loops
+
+The script is a chain: **setup → curiosity → escalation → payoff → new curiosity**. Never fact → fact → fact.
+
+**Gaps are small and frequent.** One every 30–60 seconds. A gap can be one sentence: "The experiment worked. That was the problem."
+
+**The next gap opens before the last payoff finishes landing.** "So they gave him the money. Which is when somebody should probably have asked what he was planning to do with a hot air balloon."
+
+**Every gap gets paid.** Before finishing, list your gaps and check each one off. The cold open's promise ("which one is quietly running your life") is a gap too, and it must be paid by name near the end.
+
+---
+
+## Step 5: Micro-payoffs — the retention audit
+
+Scan for any stretch longer than about fifteen seconds (~40 spoken words) that contains none of:
+
+a joke · a surprising fact · an unexpected comparison · a twist · a vivid physical image · an interesting consequence · a character moment · a change in circumstances · an escalation
+
+Found one? **Fix it by cutting, not by adding a joke.** Almost every dead stretch is setup that didn't need to be there.
+
+---
+
+## Step 6: Escalation
+
+This is the engine. It runs at two scales at once: *within* a beat, and *across* the script.
+
+Within a beat, take the fact and ask "what's the next worse version of this, and is it true?" Then ask again.
+
+> The paint glowed. → They painted their fingernails with it for fun. → They painted their teeth with it. → The company's own chemists handled it with lead screens and tongs.
+
+Across the script, each segment is more intense than the last. Do not open on your best material and coast.
+
+Ladders:
+- normal → strange → ridiculous → horrifying → absurd
+- expectation → reality → worse reality → insane payoff
+- still useful → overkill → pointless → actively working against you (Mode C)
+
+**Warning sign:** if intensity resets to baseline at the start of every section, it isn't escalating, it's a list with mood swings. In a list video, the thing that escalates can be the *absurdity of the mismatch* rather than the danger.
+
+---
+
+## Step 7: The cutaway to characters
+
+One of the most effective devices available and one of the easiest to overuse.
+
+**What it is.** The narration stops mid-stride and becomes a scene — two to five lines of dialogue between people in the story — then returns to narration with no comment. No "the conversation probably went something like this." Hard cut in, hard cut out.
+
+**Why it works.** It dramatizes a decision that would be flat as exposition. It changes the voice in the viewer's ear — a real rhythm break when everything else is one calm narrator. And it lets a character be stupid out loud instead of the narrator explaining that they were stupid.
+
+**When to use it.** At the moment somebody had to say yes to something insane — find the point where a real human, in a real room, approved a lunatic idea, and put a microphone in that room.
+
+> The Australian government's response to a nationwide bird problem was to deploy soldiers, a truck, and two machine guns.
+>
+> FARMER: The emus are destroying everything. We need help.
+> MINISTER: Say no more. How many machine guns would you like?
+> FARMER: ...I'm sorry?
+>
+> They sent two.
+
+The narration ends on the line that makes the scene inevitable. The scene lasts three lines. The last line is the punch. Narration resumes *on the story*, not on the joke.
+
+**In this channel, the ancestors are the cast.** Two ancestors by a fire talking like tired modern coworkers about a very ancient problem is the house cutaway. So is the modern figure talking to its own shadow.
+
+> ANCESTOR_1: So we stay by the fire.
+> ANCESTOR_2: What if I need to pee?
+> ANCESTOR_1: Then we'll miss you.
+
+**Other entry points:**
+- A patient being reassured by someone with a financial interest in reassuring them
+- A subordinate receiving an order that cannot possibly be followed
+- A salesman answering a question honestly by accident
+- Someone asking the obvious question nobody in the record asked
+
+> SALESMAN: It cures headaches, insomnia, toothache, and shyness.
+> CUSTOMER: What's in it?
+> SALESMAN: Mostly cocaine.
+> CUSTOMER: And the children's formula?
+> SALESMAN: Also mostly cocaine.
+
+**Register.** Characters talk like modern people — casual, bureaucratic, petty, tired. The gap between how they talk and when they lived is most of the joke.
+
+**Rules:**
+- Two to five lines. If the joke needs a sixth line, the joke is wrong.
+- Two to four cutaways per 10-minute script. They stop being a surprise after that. In a list video, never more than one per segment and never in adjacent segments.
+- Never within a minute of another.
+- Dialogue delivers *attitude*. Narration delivers facts. Never use dialogue to deliver information the viewer needs.
+- Fictional dialogue never puts an invented factual claim in a real person's mouth.
+- No stage directions, no "INT. CAVE — NIGHT."
+- The narrator can enter a scene himself and talk to a historical figure or an ancestor. Once a script at most.
+- Every line carries a speaker label in UPPER_SNAKE form (`ANCESTOR_1`), which becomes a VibeVoice voice. Keep the cast small: the narrator plus **at most three character voices per video**, and at most four speakers in any one scene (VibeVoice's limit). Each new voice is another reference clip to design and keep consistent.
+- A cutaway must work in the character's normal voice. VibeVoice can't be told to whisper, shout or sound angry, so the attitude has to live in the words.
+
+**In Mode B**, the cutaway is an aside: the threats around you become briefly, absurdly polite, and the exchange is immediately abandoned.
+
+> A pack of wolves crosses your path and, to your considerable surprise, keeps walking. They're not interested. You're a two-hundred-kilo problem with hooves, and forty yards away there's a herd with exactly one male guarding it. You nod at each other. Professional courtesy.
+
+---
+
+## Step 8: Voice
+
+### Sound like a person talking
+
+Contractions. Fragments. Mid-sentence redirection. Casual connectives. **Read every line out loud.** Anything you wouldn't say to a friend gets rewritten.
+
+> **Written:** "The results of the expedition were, to say the least, disappointing for all involved."
+> **Spoken:** "The expedition was a disaster. Of the eleven men who left, four came back, and one of those was mostly beard."
+
+### Calm is the channel's voice, not the absence of one
+
+The narrator's personality is **dry observation delivered at an even temperature.** He notices the absurd thing and says it plainly, then moves on. He never tells you something is crazy; he tells you the fact and lets the silence do it. When he's reflective — usually at the end — he gets quieter, not grander.
+
+### Rhythm
+
+Vary sentence length aggressively: **in any hundred-word stretch, the longest sentence should be at least four times the length of the shortest.**
+
+- **The pile-up.** One long sentence stacking clauses, then terminated hard.
+  > You wake up in the dark on a wet floor with someone's elbow in your ribs and the smell so thick you can only breathe through your mouth, which you will regret. Anyway. Morning.
+- **The deflation.** A big claim, then four words that undercut it.
+  > It was the most ambitious engineering project of the century. It sank.
+- **The list that breaks.** Three items where the third escalates.
+  > He lost his job, his house, and eventually about a third of his face.
+- **The stall.** A short sentence held alone before the reveal.
+  > They opened the coffin.
+
+### Specificity
+
+**A specific detail is funnier than an exaggerated one.**
+
+> **Weak:** He smelled absolutely horrific.
+> **Strong:** People could reportedly tell he'd entered a building from the next room over.
+
+> **Weak:** The food was inedible.
+> **Strong:** It was flour and water baked into a brick, and you broke it by hitting it.
+
+Reach for measurements, objects, smells, physical sensations, named consequences, weird numbers — as long as they're real (see Evidence).
+
+### Analogies
+
+Name the physical property, find a mundane object that shares it, state the comparison, **do not explain it.**
+
+> A mantis shrimp punches so fast the water around its club briefly boils into bubbles. It sounds like a gunshot inside a coffee can, and it comes from an animal the length of your thumb.
+
+Good analogies are visual, unexpected, instantly parseable and short — and in this channel, showable in one quick picture.
+
+Banned unless genuinely clever: "it's basically nature's version of..." / "it's like if X had a baby with Y" / "think of it as the Uber of..."
+
+### Narrator presence
+
+Break the documentary rhythm roughly every 20–40 seconds with one of:
+- a self-correction mid-sentence
+- an admission of research fatigue
+- a refusal: explaining why you're not going to describe what happened next
+- an argument with an imaginary objector
+- a dry aside about the source material itself
+- a direct address to the viewer, to an ancestor, or to the viewer's shadow
+
+**Personality is consistency of reaction, not a catchphrase.** Unflappable in minute two means unflappable in minute nine.
+
+### Inverse intensity
+
+**The more extreme the fact, the flatter the delivery.** Horror gets narrated as logistics.
+
+> They eventually found the missing crew member. Most of him.
+
+### Profanity and slang
+
+**Channel default: clean.** No profanity in narration, no slurs anywhere, nothing that needs bleeping. Adult wording, yes; swearing, no. The functions profanity usually serves — marking the apex of a beat, breaking register, a sudden tonal shift — are served by blunt word choice, understatement and rhythm. Do not substitute sanitized versions ("freaking," "heck"); they are worse than nothing.
+
+If the user explicitly asks for an uncensored script: profanity goes in reactions, asides and dialogue only, never in the first 30 seconds, never in the load-bearing factual sentence, roughly one per beat at most, and it should read as though it escaped rather than scheduled.
+
+Slang: only what a calm thirty-year-old narrator would plausibly say. **Forced slang is the most detectable failure in this style.** No memes, no youth-signaling.
+
+### Tonal contrast
+
+A constant stream of jokes stops being funny within two minutes. Alternate: funny → deadpan → disgusting → briefly serious → absurd → tense. A plain factual sentence is the floor the next joke stands on.
+
+Dark material: humour comes from **framing and observation**, not shock value. If the only thing making a line funny is that it's horrible, it isn't funny.
+
+---
+
+## Step 9: What to cut
+
+### Don't over-joke
+No punchline immediately after a punchline. Keep the better one.
+
+### Don't over-explain
+- Never restate a joke's mechanism.
+- Never announce a joke ("and this is where it gets ridiculous").
+- Never tag a surprising fact with "which is insane" or "let that sink in."
+- Never summarize a section you just finished.
+
+> **Before:** He then attempted to cross the channel in a barrel, which is obviously a terrible idea, because barrels are not designed for ocean travel and he had no navigation experience whatsoever. Unsurprisingly, it did not go well.
+> **After:** He then attempted to cross the channel in a barrel. He was found nine days later, sixty miles in the wrong direction, still in the barrel.
+
+**Cutting is the primary revision operation.** Never fix a weak section by adding words.
+
+---
+
+## Step 10: Transitions, callbacks, endings
+
+### Transitions
+Bad transitions announce structure. Good transitions are *caused* — the last fact creates the next situation.
+
+> **Bad:** Next on our list: snakes.
+> **Good:** The dark was a problem you could at least sit inside a fire to avoid. Snakes came to you.
+
+### Callbacks
+One or two per script. Plant deliberately and pay off at maximum irony. **Never explain the callback.** In the channel format, the cold open is the natural plant: the ending returns to it (the bedroom creak, the figure glancing at its shadow).
+
+### Endings
+
+Never: "And that's why..." / "In conclusion..." / "Thanks for watching" / "Don't forget to like and subscribe."
+
+Shapes:
+- **The reflective close (channel default)** — the camera pulls back from the jokes; one or two quiet sentences that reframe the viewer. "Your ancestors survived because they were scared of the right things. You just inherited the whole list."
+- **The final absurd fact** — the thing you held back all script
+- **The callback payoff**
+- **The ironic reversal** — the outcome inverts the premise
+- **The dark punchline**
+- **The refused moral**
+- **The tonal inversion** — the comedy stops and the last thirty seconds are quiet and bleak
+
+**One comment prompt is allowed**, and only after the real ending: a single short line that asks the viewer to identify themselves ("Tell me which one you inherited."). It is a question about them, not a request for engagement. No subscribe request in the narration.
+
+The ending is the last payoff of the story, not a summary of it.
+
+---
+
+## Step 11: Write for the edit
+
+This is video. A sentence that describes an abstraction gives the editor nothing. A sentence that describes a *thing* gives them a shot.
+
+**The picture changes fast.** A still stays on screen for under 2 seconds and an animation for under 10, and about half the video is animation. So a 10-minute script needs roughly 150–170 stills and 55–65 short animations. Write sentences that *generate* pictures: an object, an action, a place, a before and after, a number that can be drawn as a bar, a comparison that can be put side by side. A paragraph of abstractions forces the production step to invent filler.
+
+**Stay style-free.** The user picks the art style at generation time. Never write visual notes that assume a look ("flat", "cartoon", "realistic", "stick figure"). Describe what is in the frame, not how it's drawn.
+
+**Write motion that survives image-to-video.** Animations start from a still and add one simple movement: a flinch, a head turn, a recoil, freezing, pointing, sitting up, a shadow moving, fire flickering, a meter filling, a slow push-in. Avoid moments that only work with walking, running, crowds in motion, detailed hand work or lip-sync.
+
+**The channel's recurring cast and props** (from the launch decision; the production step turns them into a moodboard). Poses: recoil, freeze, flee, asleep, standing, pointing, shrug, sitting, glancing back, cowering. Settings: night bedroom, night savannah with a fire, plain diagram background, cliff edge, water, stage. Props: spider, snake, moon-phase bar, lion eyes in darkness, alarm meter, simple needle, crowd silhouettes, fire. New things are fine when the script needs them; the production step adds them to the moodboard.
+
+**Nothing graphic.** Spiders, snakes, blood, needles and injuries are shown simply, never realistically or gorily. Nothing that reads as a children's cartoon either: the channel is adult and dark.
+
+**No words inside pictures.** Any on-screen word, number or label is a text card added in the editor. Mark the ones you want (a burned-in line every 15–30 seconds).
+
+**Honesty with the packaging.** Every element promised by the title and thumbnail (the tiny spider, the ancestor shadow) must appear in the video, and the title's question must be answered.
+
+Some lines exist purely to cue a visual, and that's legitimate:
+> Here's what that looks like on the meter. Now put it next to your bedroom.
+
+## Evidence, citations and sensitive topics
+
+The exaggeration lives in the framing, the analogy and the narrator's reaction. **The underlying claim stays accurate.**
+
+### Named evidence
+- **Each main segment carries at least one real, named source** — a study, a researcher, a dataset, a primary document. Say it on air in plain speech: "In 2011, a team led by the ecologist Craig Packer looked at hundreds of lion attacks in Tanzania..." Year + who + what they looked at + what they found. Never a bare "studies show."
+- **Verify before writing.** If you can search, check every study: authors, year, what was actually measured, what was actually found. If you cannot search, mark every study-dependent sentence `[VERIFY]` and describe only what you are confident of — never fill in a number, sample size or finding you are unsure of.
+- **Don't overstate the finding.** "Toddlers spotted snakes faster than flowers in a lab task" is what a study found; "humans are born afraid of snakes" is not. Report what was measured, then let the narrator draw the modest conclusion.
+- Never invent specifics. A fabricated statistic is not a joke, it's an error wearing one.
+
+### Evolutionary explanations (this channel's biggest trap)
+"Our ancestors needed X, so we have X" is easy to say and often unproven. Keep three levels distinct and let the wording show which one you're on:
+1. **Measured** — an experiment or dataset shows it. Say it plainly.
+2. **Well-supported explanation** — the mainstream account among researchers (e.g. prepared learning of certain fears). "The leading explanation is..."
+3. **Plausible story** — reasonable but untested. Hedge it openly, and the hedge can be the joke: "Nobody has a fossil of this. But it's the best guess anyone has, and it's a pretty good guess."
+
+The script should contain all three levels and never present level 3 as level 1.
+
+### Hedging disputed or legendary material
+Hedge disputed, legendary or single-source claims — hedging can be funny.
+> This comes from one guy's diary, and that guy was trying to sell a book.
+
+If a great joke requires distorting a fact, the joke loses. There's always another joke.
+
+### Health-adjacent topics (fears, phobias, sleep, anxiety, food)
+- The narrator is a storyteller reporting research, never a clinician. No diagnosis, no treatment advice, no "if you have X, do Y."
+- Frame the everyday version as a normal, evolved response.
+- Include **one plain, sincere sentence** — not a disclaimer voice, not a joke — noting that when a fear or pattern is running someone's life, it's very treatable and a professional can help. Place it where the script naturally turns serious (usually near the payoff), once.
+- Never mock people with a severe version of the condition. Mock the mismatch between the old alarm and the modern situation.
+
+### Real people
+Real living people: no invented quotes, no defamatory framing. Cutaways with historical figures dramatize attitude, not evidence.
+
+---
+
+## Writing for the voice (VibeVoice)
+
+The narrator and every character are voiced with VibeVoice, which clones a voice from a reference clip and speaks exactly the text it is given. It has **no emotion tags and no delivery instructions**. Anything in brackets or parentheses gets read out loud. Write so the words alone carry the performance:
+
+- **Delivery lives in the wording.** If a line needs to sound bored, write it bored ("Then we'll miss you."), don't label it. Deadpan comes from short sentences and full stops.
+- **Punctuation is timing.** A full stop is a beat; a comma is a smaller one. Prefer full stops and commas. Em dashes are fine in the script, but the production step turns them into commas or full stops for the voice files, so the line must still work that way. Avoid semicolons, colons, ellipses and parentheses in spoken lines.
+- **Silence is an edit, not a tag.** If a stall needs a pause ("They opened the coffin." then nothing), end the paragraph there and say so in the draft; the production step turns it into a hold.
+- **Numbers:** VibeVoice doesn't normalize text, so the production step spells every number, symbol and abbreviation out in the voice files. Plain years and counts can stay as digits in the script. Where the reading is ambiguous or the rhythm depends on it, write it the way it should be said ("two thousand eleven", not "twenty eleven"). No symbols or abbreviations in spoken lines ("percent", "and colleagues", "versus").
+- **Unusual names**: note a pronunciation in the pronunciation notes (Seligman: SELL-ig-man). The production step respells in the voice file only if the model gets it wrong.
+- **No ALL CAPS, italics or emphasis markup in spoken lines.** If a word needs stress, restructure so it lands last.
+- **Don't open a paragraph with "Welcome", "Hello", "Hi" or "However".** Greetings make VibeVoice more likely to invent background music, and "however" is banned anyway.
+- **Keep sentences voiceable in one breath.** Deliberate pile-ups are fine; accidental 50-word sentences aren't.
+
+## Output format
+
+The **final deliverable is the production package defined by the `video-production-format` skill**. Load that skill and follow its format for the finished script. This skill decides what is said; that one decides how it's laid out, timed and split into voice, image, animation and sound files.
+
+Before packaging, or when the user asks only for a draft, outline or rewrite, use this **draft format** so the story can be reviewed without production detail:
+
+```
+TITLE: <working title>
+TARGET: 10:00 · ~1,700 spoken words at 170 wpm
+MODE: C · SPINE: <spine> · ENDING: <shape>
+VOICES: NARRATOR · ANCESTOR_1 · ANCESTOR_2
+
+=== SEG-00 · COLD OPEN · ~85 words ===
+
+Last night, a sound in the dark made your heart jump.
+[SEE: figure in bed, head snapping toward a dark doorway] [SFX: floor creak]
+
+There was nothing there.
+[HOLD]
+
+Your brain wasn't broken...
+[SEE: the figure's shadow on the wall is an ancestor crouched by a dying fire] [TEXT: FACTORY SETTINGS: STONE AGE]
+
+ANCESTOR_1: Did you hear that?
+ANCESTOR_2: It's the wind.
+ANCESTOR_1: The wind has never once eaten anyone. Say it's the wind again.
+
+Narration resumes immediately, with no comment on the scene.
+```
+
+Draft rules:
+- `===` segment headers carry the segment number, name and word budget. They are never spoken.
+- Narration is unlabeled. **Every dialogue line carries a speaker label.** No delivery notes after the label.
+- `[SEE: ...]` is optional in drafts: a style-free note of what the picture should show, only where it isn't obvious from the sentence. The production step writes the actual image and animation prompts.
+- `[TEXT: ...]` marks a burned-in text card (2–5 words). `[SFX: ...]` marks a sound the moment depends on. `[HOLD]` marks a deliberate silence.
+- Word count covers spoken words only. **Hit the target within 10%.**
+
+After the draft (and handed to the production step with the final script), deliver:
+
+1. **Word budget table**: each segment, spoken words, estimated duration at `NARRATOR_WPM`.
+2. **Sources**: a description-ready list of every study or source named on air (authors, year, title, journal or publisher).
+3. **Verify list**: every specific claim (number, date, finding), its source, and status: verified or `[VERIFY]`.
+4. **Uncertainty note**: claims that are disputed, legendary, single-sourced, or level-3 explanations, so the user can decide what to keep.
+5. **Pronunciation notes** for unusual names.
+
+If the user asks only for an outline, beat map or treatment, deliver the header block, the beat map (function / information / payoff / open question per beat), the word budget per segment, and the sources to verify. No full draft.
+
+## Patterns that make writing sound machine-generated
+
+Aggressively avoid all of these.
+
+**Banned constructions:**
+- "However" as the default pivot — use "but," "except," or nothing
+- "But here's the thing" / "here's where it gets interesting" / "and that's not even the craziest part"
+- "It's worth noting" / "that said" / "needless to say"
+- The not-X-but-Y frame ("it wasn't a job, it was a sentence")
+- Colon-then-reveal sentences
+- Scare quotes around an invented label
+- "Let's dive in" / "buckle up" / "strap in"
+- "Evolution designed you to..." / "Mother Nature decided..." — evolution doesn't design or decide; say what happened
+- Any sentence announcing what the script is about to do
+
+**Structural tells:**
+- Uniform paragraph length
+- Every paragraph landing on a mini-punchline
+- A rhetorical question every fourth sentence
+- Three-item lists appearing more than twice
+- Stacked adjectives doing a noun's work
+- Intensity resetting to baseline at every section break
+- List segments that all open the same way
+- The joke explained by the following sentence
+- Prose with no fragments — smooth, even, completely flat
+
+**The diagnostic:** read only the first sentence of each paragraph, in sequence. If they sound like a list of topic sentences, you've written an essay in a costume. For list videos, also read only the first sentence of each segment: if you can see the template, rotate it.
+
+**Repair drill:**
+
+> **Generated:** The Great Emu War of 1932 was a fascinating episode in Australian history. However, it's worth noting that the operation did not go as planned. The soldiers, armed with machine guns, faced an unexpected challenge: the emus proved surprisingly resilient. But here's the thing — nature had the last laugh.
+
+> **Repaired:** In 1932, Australia sent soldiers with machine guns to shoot some birds. The birds won. Not metaphorically — the army packed up its guns and went home.
+
+Four sentences became three, every connective died, "fascinating," "unexpected" and "surprisingly" were deleted rather than replaced, and the punchline is a fact rather than a flourish.
+
+---
+
+## Worked example — Mode C (one list segment, ~45 seconds)
+
+> === SEG-02 · THE DARK · ~125 words ===
+>
+> You switch off the light, and for half a second the room stops being a room.
+> [SEE: hand hits a light switch, the bedroom drops into darkness]
+>
+> Your ancestor didn't have a bedroom. He had a fire, and a fire has an edge, and past the edge was everything that could see in the dark better than he could.
+> [SEE: the shadow on the wall becomes an ancestor at the edge of a firelit circle; two eyes open in the black beyond]
+>
+> In two thousand eleven, a team led by the ecologist Craig Packer looked at hundreds of lion attacks on people in Tanzania. Most came in the evening. And they piled up in the days after a full moon, when the sun has set and the moon hasn't risen yet.
+> [SEE: moon-phase bar filling; a tally of attacks stacking up just after the full moon] [TEXT: WORST NIGHTS: AFTER FULL MOON]
+>
+> ANCESTOR_1: So we stay by the fire.
+> ANCESTOR_2: What if I need to pee?
+> ANCESTOR_1: Then we'll miss you.
+>
+> Nothing in your bedroom is a lion. Your brain has not been told.
+> [SEE: back in the bedroom; the alarm meter reads nearly as high now as it did then]
+
+Annotations: opens on an ordinary modern moment · the ancestor arrives through the shadow, not through exposition · the study is named with year, lead researcher, what was looked at and what was found, with no invented numbers · the cutaway delivers attitude, not facts, and works in plain voices with no delivery notes · the return to "you" is a flat, funny verdict, and the meter gives the editor a recurring beat · every sentence suggests a picture without naming a style · the year is written the way it should be said. (Verify Packer et al. 2011, PLoS ONE, before use.)
+
+## Worked example — Mode A
+
+> Everybody knows about the Salem witch trials. Almost nobody knows that the whole thing got a push from a cake.
+>
+> In early 1692, two girls in the Parris household started having fits — contorting, screaming, complaining that something was biting them. The local doctor examined them and reached the obvious medical conclusion available to a professional in 1692.
+>
+> DOCTOR: Witches.
+> PARRIS: Are you sure?
+> DOCTOR: I've ruled out everything else.
+> PARRIS: What else did you check?
+> DOCTOR: Nothing.
+>
+> A neighbor decided to help. Her plan was to take the girls' urine, bake it into a cake, and feed the cake to a dog, because the dog would then somehow reveal the witch. This is a real thing that a real adult did. The dog, to nobody's credit, declined to name anyone.
+>
+> But the cake made it official. Before the cake, two kids were sick. After the cake, there was a witch in the village, and the only remaining question was which of your neighbors it was. By autumn, nineteen people had been hanged, and one man had been slowly crushed under stones, which wasn't technically an execution, because he refused to enter a plea and the court had a procedure for that.
+>
+> He was somewhere around eighty.
+
+Annotations: hook demolishes a known story · setup line makes the cutaway inevitable · cutaway is five lines and exits hard · specificity (urine, cake, dog) does the comedy · "to nobody's credit" is the one aside · escalation from farce to nineteen hangings · the ending is a fact delivered flat — and hedged, because his exact age is disputed.
+
+## Worked example — Mode B
+
+> You hatch into total darkness two thousand feet down, roughly the size of a grain of rice, and the situation is already worse than you know.
+>
+> The good news is you can swim. The bad news is everything else. There's no light down here, no plants, and whatever you eat has to fall from a world you'll never see. So you drift, you wait, and you get very good at doing nothing, because doing nothing is cheap.
+>
+> Then you grow up, and your body makes a decision on your behalf.
+>
+> Your digestive system starts to shut down. You are, from this point forward, no longer an animal that eats. What you are instead is a nose — an enormous, sensitive nose with a tail, one job, and a limited amount of stored energy to do it with.
+>
+> Somewhere out there in the black water is a female many times your size. You have to find her by smell, in the dark, before you starve.
+>
+> Let's say you do.
+
+Annotations: cold open into the body · "already worse than you know" is a curiosity gap in six words · facts arrive as things happening to you · the escalation is a body failing on schedule · closes on a stall that opens the next section.
+
+---
+
+## Workflow
+
+1. State the premise in one sentence: what the video *shows*, not what it covers. Note the title and thumbnail the script must pay off.
+2. Research. For each candidate fact, record the source and its evidence level (measured / well-supported / plausible story). Flag anything disputed or single-sourced.
+3. Select the strongest facts: surprising, visual, escalatable, showable in a quick picture. Discard the merely true.
+4. Pick the mode (Mode C for channel videos about the viewer).
+5. Pick the spine and the ending shape together. For list videos, state the one rule and the recurring visual device.
+6. Set the word budget: runtime × `NARRATOR_WPM`, split per segment.
+7. Write the cold open to the channel template.
+8. Build the beat map (function / information / payoff / open question). For list videos, order segments by escalating misfire and vary each segment's internal order.
+9. Mark escalation points, cutaways (2–4, at most three character voices), callbacks, the health line if relevant, and tonal shifts, where the *material* suggests them.
+10. Draft fast and conversationally in the draft format.
+11. Read the whole thing aloud. Mark every place the voice stalls, flattens or sounds written.
+12. **Cut.**
+13. Rhythm and voice pass: sentence variation, ambiguous numbers written as spoken, no symbols, no delivery notes, nothing that only works with an emotion tag.
+14. Curiosity check: list every gap opened and confirm each one is paid, including the cold-open promise.
+15. Evidence check: every claim survives the joke, every named study verified or marked `[VERIFY]`, evidence levels honest.
+16. Picture check: every stretch of about 2 seconds suggests something to show; nothing graphic; nothing style-dependent.
+17. Rewrite weak sections. **Never repair by addition.**
+18. Deliver the final script with the word budget table, sources, verify list, uncertainty note and pronunciation notes, then package it with the `video-production-format` skill.
+
+## Quality control
+
+Run all sixteen. Score each **pass / weak / fail**.
+
+| Check | Question | Fix |
+|---|---|---|
+| **Hook** | Is the premise live within 15 seconds (~40 words)? Viewer's own moment first? | Rewrite to the cold-open template. |
+| **First payoff** | Does the first named evidence land by ~2:00? | Move a study earlier; cut setup. |
+| **Narrative** | Is this a story, or a list with jokes? Is there one rule tying the list together? | State the rule; re-map beats onto a spine. |
+| **Retention** | Any stretch over ~15 s with no reward? | Cut it. |
+| **Curiosity** | Gaps opened and paid every 30–60 s? Cold-open promise paid? | Add gaps at beat boundaries; pay the orphans. |
+| **Humor** | Do jokes come from the material or get bolted on? | Delete bolted-on jokes. Find the joke inside the fact. |
+| **Voice** | One calm, dry, specific narrator throughout? No hype, no gasping? | Flatten the delivery; replace intensifiers with facts. |
+| **Rhythm** | Sounds good aloud? 4:1 length variation? | Break up uniform runs; add fragments. |
+| **Escalation** | Is the last third the most intense or most absurd? | Reorder segments; hold back your best material. |
+| **Template fatigue** | Do consecutive segments open or run the same way? | Rotate the segment template. |
+| **Specificity** | Concrete details you'd remember tomorrow? | Replace intensifiers with objects and measurements. |
+| **Evidence** | Every segment has a named, verified (or flagged) source? Evidence levels honest? No evo-psych just-so stories stated as fact? | Verify, hedge, or cut. |
+| **Promise & safety** | Title and thumbnail paid off? Health line present once, sincere? No treatment advice? Nothing graphic? | Add the admission, the line, or swap the imagery. |
+| **Pictures** | Does every ~2 s suggest something to show? Text card every 15–30 s? Nothing graphic or style-dependent? | Convert abstractions into things; cut style words. |
+| **Voice & length** | Ambiguous numbers written as spoken, no symbols, no delivery notes, every character line works in a plain voice, ≤ 3 character voices, within 10% of word target? | Fix the lines; rewrite attitude into the words; cut to length. |
+| **AI detection / Ending** | Anything sterile, even or polished? Is the last line a payoff, not a summary? | Run the diagnostic and repair drill; pick a shape from Step 10. |
+
+**One fail, or three weaks, means rewriting the affected sections — not polishing them.**
+
+Run the AI-detection check last, and run it adversarially: argue that your own script was machine-written, gather the evidence, then destroy the evidence.

@@ -1,0 +1,33 @@
+PROMPT 001
+
+Create a clean, humorous 2D illustrated stickman scene using the attached reference images as the primary visual style references.
+
+**IMPORTANT — STYLE MATCHING:** Carefully study the reference images before generating. Reproduce their distinctive visual language: extremely simple hand-drawn stickman characters, oversized expressive heads, thick uneven black outlines, minimal facial features, thin black stick limbs, deliberately crude cartoon proportions, sparse flat colors, simple solid white backgrounds, minimal environmental detail, and a slightly awkward, comedic illustrated feel. Preserve the same overall line quality, character simplicity, color restraint, and visual storytelling approach. Do not turn this into polished 3D art, realistic illustration, anime, a detailed comic, or a generic modern vector cartoon.
+
+**Scene:** A stickman character is sitting at a simple desk, staring at a computer screen while an enormous pile of unfinished papers and small task notes surrounds them. Their posture looks tired and overwhelmed. A tiny clock sits on the desk, and a simple cup is nearby. Keep the environment extremely minimal, using only a few recognizable objects. The character should remain the clear focal point.
+
+Use a wide landscape composition similar to the references, with generous white space, clean readable silhouettes, and a funny visual exaggeration. Keep the drawing simple enough to look like it belongs to the same illustrated series. No written words, captions, labels, watermarks, or decorative text anywhere in the image.
+
+---
+
+PROMPT 002
+
+Create a completely new scene using the **approved first generated image as the primary style anchor**.
+
+**STYLE LOCK:** Preserve the exact same approved visual direction from image 1: the same simple hand-drawn stickman aesthetic, thick uneven black outlines, character proportions, facial simplicity, line quality, restrained flat-color palette, white-background treatment, minimal detail, and humorous visual storytelling. Treat the approved first image as the established art direction for this entire batch. Do not introduce a new art style, polished rendering, realistic anatomy, detailed textures, or unnecessary visual complexity.
+
+**Scene:** A stickman character is standing beside a simple bed, desperately trying to wake up while a large alarm clock rings on a small bedside table. The character looks sleepy and annoyed, with messy posture and an exaggerated tired expression. Include only a few minimal bedroom elements, such as the bed, pillow, and bedside table. Make the scene visually distinct from image 1 while keeping the same character simplicity and comedic tone.
+
+Use a wide landscape composition, clear silhouettes, generous white space, and the same restrained visual treatment as the approved style anchor. No written words, captions, labels, watermarks, or decorative text anywhere in the image.
+
+---
+
+PROMPT 003
+
+Create a completely new scene using the **approved first generated image as the primary style anchor**.
+
+**STYLE LOCK:** Maintain the same approved art direction established by image 1. Preserve the same hand-drawn stickman construction, thick uneven black outlines, oversized simple heads, minimal facial features, thin stick limbs, restrained flat colors, sparse white background, minimal props, and deliberately simple humorous illustration style. The style must feel like the same artist created all three images. Do not copy the previous scene's composition; preserve the style, not the layout.
+
+**Scene:** A stickman character is standing in front of a large mirror, comparing their reflection with an exaggeratedly confident version of themselves. The real character looks uncertain and slightly awkward, while the reflection poses proudly with one hand on its hip. Keep the mirror and surrounding environment extremely simple. Use the contrast between the two poses to create a clear, funny visual story.
+
+Use a wide landscape composition, strong readable silhouettes, generous white space, and the same minimal visual storytelling approach as the approved first image. No written words, captions, labels, watermarks, or decorative text anywhere in the image.

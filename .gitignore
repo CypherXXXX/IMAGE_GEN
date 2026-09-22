@@ -1,0 +1,11 @@
+node_modules/
+dist/
+browser-profiles/
+batches/
+*.tmp
+*.log
+config.json
+logs/
+README.md
+.env
+downloaded_images/

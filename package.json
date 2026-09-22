@@ -1,0 +1,30 @@
+{
+  "name": "chatgpt-image-batch-studio",
+  "version": "1.0.0",
+  "description": "ChatGPT Web Image Batch Automation Studio — browser-automated, human-in-the-loop batch image generation with style consistency",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "test": "jest --config jest.config.js",
+    "test:browser": "ts-node src/tests/browser-test.ts",
+    "test:single-image": "ts-node src/tests/single-image-test.ts",
+    "login": "ts-node src/login.ts"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "playwright": "^1.49.0",
+    "sharp": "^0.33.5",
+    "uuid": "^10.0.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.5.0",
+    "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.5.12",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.0"
+  }
+}

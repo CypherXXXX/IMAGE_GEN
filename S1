@@ -1,0 +1,640 @@
+---
+name: video-production-format
+description: >
+  Package a finished YouTube script into a strict, production-ready folder that
+  can be built directly: master script with line IDs and timings, paste-ready
+  VibeVoice (ComfyUI) voiceover files, character voice-design prompts, a
+  moodboard, art-style-agnostic image and image-to-video prompts, Stable Audio 3
+  SFX prompts, on-screen text and a master timeline CSV for the video editor.
+  Use together with the youtube-script skill whenever a script is to be turned
+  into a production package, timed, re-timed after voiceover, or when the user
+  asks for image, animation, SFX, voice or moodboard prompts for a video.
+---
+
+# Video Production Format
+
+## What this skill does, and what it does not
+
+The **youtube-script** skill decides *what the video says*. This skill decides *how that finished script is packaged* so every voiceover, image, animation, sound effect and text card can be generated independently and dropped into the editor without guesswork.
+
+This skill **never** changes the story, the facts, the jokes or the wording. The only edits allowed to spoken text are the VibeVoice text normalizations listed under *VO text rules*. If the script breaks a production limit (too many voices, a scene nothing can show), stop and send it back to the script step with the reason. Do not quietly rewrite it.
+
+Every rule below marked **MUST** or **NEVER** is a hard rule. A package that breaks one is not finished.
+
+---
+
+## 1. The package
+
+For each video, create exactly this tree. Folder and file names are fixed.
+
+```text
+V###-<video-slug>/
+├── 00_brief/
+│   └── brief.md
+├── 01_script/
+│   ├── script.md
+│   ├── vo_index.md
+│   └── vo/
+│       ├── VO-001.txt
+│       ├── VO-002.txt
+│       └── ...
+├── 02_voice_design/
+│   └── characters.md
+├── 03_moodboard/
+│   └── moodboard.md
+├── 04_images/
+│   ├── images.md
+│   └── thumbnail.md
+├── 05_animations/
+│   └── animations.md
+├── 06_sfx/
+│   └── sfx.md
+└── 07_timeline/
+    └── timeline.csv
+```
+
+- `V###` is the channel's video number (`V001`), `<video-slug>` is lowercase-hyphenated (`V001-still-scared-of-things`).
+- No other top-level folders. No empty files: if a video truly has no dialogue characters, `characters.md` contains one line: `No character voices in this video.`
+- One script per video. No A/B variations.
+
+### Generated asset filenames
+
+The user's generated files MUST use the asset ID as the filename, so the editor import matches the timeline:
+
+| Asset | ID | File the user saves |
+|---|---|---|
+| Voiceover block | `VO-001` | `VO-001.wav` |
+| Image | `IMG-001` | `IMG-001.png` |
+| Animation | `ANM-001` | `ANM-001.mp4` |
+| Sound effect | `SFX-001` | `SFX-001.wav` |
+| Ambience bed | `AMB-001` | `AMB-001.wav` |
+| Music (only if asked) | `MUS-001` | `MUS-001.wav` |
+| Character voice reference | `ANCESTOR_1` | `ANCESTOR_1.wav` |
+| Moodboard sheet | `MB-CHAR-01` etc. | `MB-CHAR-01.png` |
+
+---
+
+## 2. IDs
+
+| Thing | Format | Example |
+|---|---|---|
+| Segment | `SEG-##` | `SEG-00` (cold open), `SEG-01` |
+| Spoken line | `L###` | `L001` |
+| Hold (intentional silence) | `H###` | `H001` |
+| VO block | `VO-###` | `VO-004` |
+| Still image | `IMG-###` | `IMG-017` |
+| Animation | `ANM-###` | `ANM-006` |
+| SFX event | `SFX-###` | `SFX-003` |
+| Ambience bed | `AMB-###` | `AMB-001` |
+| On-screen text | `TXT-###` | `TXT-005` |
+| Speaker | `NARRATOR`, or UPPER_SNAKE name | `ANCESTOR_1` |
+| Moodboard entry | `MB-<TYPE>-##` | `MB-CHAR-01`, `MB-ENV-02`, `MB-PROP-03`, `MB-DEV-01` |
+
+Rules:
+- Three-digit zero padding. Numbered in timeline order.
+- **NEVER** reuse or renumber an ID once the package is delivered, because generated files are already named after it. When a re-time splits an asset, add a letter suffix (`IMG-045b`); when an asset is dropped, retire its ID and leave the gap.
+- Speaker names are identities, never moods: `ANCESTOR_1`, not `SCARED_ANCESTOR`.
+
+---
+
+## 3. Timing
+
+### Time format
+- Timestamps: `HH:MM:SS.mmm` (`00:01:23.450`). Ranges: `00:01:23.450 → 00:01:28.900`. Durations: seconds with three decimals (`5.450s`).
+- **NEVER** "around", "about", "after this line" or any other vague timing.
+- The whole package uses one master timeline starting at `00:00:00.000`.
+
+### Estimating before the voiceover exists
+The first package is an estimate (`VERSION: v1-estimated`), because real timing only exists once VibeVoice has spoken the lines.
+
+- `NARRATOR_WPM` is set in `brief.md`. Use the measured value if the user has given one. Otherwise use **170** (the launch-decision narration pace) and mark it `estimated`.
+- Line duration = spoken words × 60 ÷ WPM, rounded up to 0.1 s, minimum 0.8 s. Count words as they appear in the VO text (numbers spelled out count as words).
+- Dialogue uses the same WPM unless a character's measured pace is given.
+- Lines follow each other with no gap. Silence exists only as an explicit `H###` hold.
+- Holds: 0.4–2.0 s, used only where the script's timing depends on silence (a stall before a reveal, the beat after a cutaway punchline). Never more than one hold in a row.
+- **Holds sit only between VO blocks.** If the script needs silence after a line, that line ends its block and the next line starts a new block. The editor never has to cut inside a VO file.
+
+### Re-timing after the voiceover (v2)
+When the user supplies rendered VO durations or word timestamps (from any aligner, such as WhisperX or VibeVoice-ASR):
+
+1. Place VO blocks end to end in order, with holds between them as scripted.
+2. Inside each block, set each line's start and end from the word timestamps. If you only have the block's total duration, scale the block's estimated line durations proportionally to fit.
+3. Recalculate every visual, text card and SFX from its **anchor** (see below). Never move an anchor to fix a duration problem.
+4. Re-check the hard limits. A still that now runs 2.000 s or longer is split into two images (`IMG-045` + `IMG-045b`, new prompt for the `b` shot). An animation that now runs 10.000 s or longer is split at a motion beat or cut shorter, with the next visual extended back.
+5. Set `VERSION: v2-retimed`, drop every `EST` marker, rewrite `timeline.csv`.
+
+### Anchors
+Every visual, text card and SFX is placed by an **anchor**, not a free timestamp. That is what makes re-timing mechanical.
+
+- `L012`: starts when line L012 starts.
+- `L012@"doorway"`: starts on the first spoken word "doorway" in L012 (the word as written in the VO text). Use a word that occurs once in the line.
+- `H003`: starts when hold H003 starts.
+- Visuals end where the next visual starts. SFX and text cards end after their stated duration.
+
+---
+
+## 4. `00_brief/brief.md`
+
+```markdown
+# BRIEF — V001 · <working title>
+
+VERSION: v1-estimated
+TITLE: <launch title>
+ALT TITLES: <search title> · <test title>
+TARGET RUNTIME: 00:10:00.000
+ESTIMATED RUNTIME: 00:10:03.400
+NARRATOR_WPM: 170 (estimated | measured)
+SPOKEN WORDS: 1,712
+FORMAT: 1920×1080, 16:9, <fps set by user>
+
+## Voices
+| Speaker | Source | Seed | VO blocks |
+|---|---|---|---|
+| NARRATOR | existing reference clip (user's own, not designed here) | <user's narrator seed> | VO-001, VO-002, ... |
+| ANCESTOR_1 | 02_voice_design/characters.md | <fill after test> | VO-004, VO-011 |
+
+## VibeVoice settings (starting point)
+model: VibeVoice-Large (Large-Q8 or Large-Q4 when VRAM is short)
+use_sampling: false (deterministic)
+cfg_scale: 1.3 · diffusion_steps: 20 · voice_speed_factor: 1.00
+max_words_per_chunk: 250 (VO blocks are capped at 200 words, so they are never auto-split)
+
+## Style slot
+ART STYLE: [user fills; every image, animation and moodboard prompt is style-free]
+STYLE PREFIX FOR PROMPTS: [user fills, prepended to every prompt at generation time]
+
+## Counts
+Lines: 138 · Holds: 9 · VO blocks: 17 · Images: 162 stills + 58 start frames · Animations: 58
+Screen time: stills 49.6% · animation 50.4%
+SFX: 21 · Ambience beds: 4 · Text cards: 27
+
+## Segment map
+| Segment | Range | Lines | Words |
+|---|---|---|---|
+| SEG-00 Cold open | 00:00:00.000 → 00:00:29.800 | L001–L008 | 84 |
+...
+
+## Launch-decision checks
+- Cold open ends by 00:00:30: yes (00:00:29.800)
+- First named evidence lands by 00:02:00: L021 at 00:01:44.200
+- Ancestor-as-shadow device used: IMG-006, ANM-002, ...
+- Every thumbnail element appears in the video: spider (IMG-088), shadow (IMG-006)
+
+## Upload notes
+Made for Kids: No
+AI disclosure: follow the launch decision (tick if music is AI-generated); re-check YouTube's current rules if the art style becomes realistic.
+Description sources: <every study named on air, full citation>
+```
+
+Every field is filled. Counts and percentages are computed from the timeline, not guessed.
+
+---
+
+## 5. `01_script/script.md` — the master script
+
+The readable source of truth. Every spoken line is a record. No free prose.
+
+```markdown
+# SCRIPT — V001 · <title>
+VERSION: v1-estimated · NARRATOR_WPM: 170 (estimated)
+
+## SEG-00 · COLD OPEN · 00:00:00.000 → 00:00:29.800
+
+[L001]
+TIME: 00:00:00.000 → 00:00:03.600 · 3.600s · EST
+SPEAKER: NARRATOR
+VO: VO-001
+TEXT: Last night, a sound in the dark made your heart jump.
+VISUALS: IMG-001 (L001) · ANM-001 from IMG-002 (L001@"sound")
+SFX: SFX-001 (L001@"sound")
+TXT: —
+
+[L002]
+TIME: 00:00:03.600 → 00:00:05.000 · 1.400s · EST
+SPEAKER: NARRATOR
+VO: VO-001
+TEXT: There was nothing there.
+VISUALS: ANM-001 continues
+SFX: —
+TXT: —
+
+[H001]
+TIME: 00:00:05.000 → 00:00:05.600 · 0.600s · EST
+TYPE: HOLD
+VISUALS: IMG-003 (H001)
+
+[L003]
+TIME: 00:00:05.600 → 00:00:07.200 · 1.600s · EST
+SPEAKER: NARRATOR
+VO: VO-002
+...
+```
+
+Rules:
+- **One narrator line = exactly one sentence** (a fragment counts as a sentence). **One dialogue line = exactly one speaker turn**, at most two short sentences.
+- `TEXT` is the script's wording exactly as the script skill wrote it (em dashes and all). The VO files hold the normalized version.
+- Every line lists its VO block, every visual that starts inside it, and any SFX or text card anchored in it.
+- Segment headers carry the segment's range. They are never spoken.
+- End the file with `## FACT NOTES`: the script's verify list and uncertainty note, copied in unchanged.
+
+---
+
+## 6. Voiceover — VibeVoice in ComfyUI
+
+The workflow is the Enemyx-net **VibeVoice-ComfyUI** node pack. What matters for the package:
+
+- **Single Speaker** node: `text` + one `voice_to_clone` clip.
+- **Multiple Speakers** node: up to **4 speakers**, text written as `[1]: ...`, `[2]: ...`, with `speaker1_voice` … `speaker4_voice` clips.
+- VibeVoice **clones voices from reference audio**. It has no text voice design, no emotion tags and no delivery instructions. Anything in the text is spoken aloud.
+- Delivery comes from exactly two places: **the reference clip** (its tone, pace and energy carry over) and **the words and punctuation**.
+- The wrapper's `[pause]` / `[pause:ms]` tags split the text into separate chunks and weaken the model's sense of context, so this package does not use them.
+- Texts over the chunk size (default 250 words) are auto-split, which can change pacing.
+- Background music or noise can appear on its own. It's more likely when the reference clip has any, when text opens with greetings such as "Welcome to" or "Hello", and with smaller models; the Large model is more stable.
+- English (and Chinese) only. The model does no text normalization, so the text must already be in speakable form.
+
+### VO blocks
+A VO block is one generation, one audio file.
+
+- **Narration blocks**: Single Speaker node, the NARRATOR clip. Consecutive narrator lines, **never more than 200 words**, split only at sentence boundaries, and preferably at segment boundaries (one list segment ≈ one block).
+- **Scene blocks** (cutaways): all turns of one scene in one block, so the exchange keeps its conversational timing. Two or more speakers: Multiple Speakers node with `[N]:` turns. One speaker: Single Speaker node.
+- The narrator is inside a scene block **only** when the narrator talks to a character in that scene; then the narrator takes a slot with the same narrator clip.
+- **NEVER** put narration and a cutaway scene in the same block otherwise.
+- **NEVER** more than 4 speakers in a block, and never more than 3 designed character voices per video.
+- A block **MUST NOT** begin with "Welcome", "Hello", "Hi" or "However".
+
+### `01_script/vo/VO-###.txt` — paste-ready text
+Contains **only** the text to paste into the node. No IDs, no headings, no comments, no speaker names (except the `[N]:` prefixes in multi-speaker blocks). One line record per text line.
+
+Narration block:
+```text
+Last night, a sound in the dark made your heart jump.
+There was nothing there.
+Your brain wasn't broken.
+```
+
+Scene block:
+```text
+[1]: So we stay by the fire.
+[2]: What if I need to pee?
+[1]: Then we'll miss you.
+```
+
+### VO text rules (the only permitted changes to script wording)
+1. Em dashes, semicolons, colons, ellipses and parentheses become a comma or a full stop, whichever keeps the rhythm. Allowed punctuation in VO text: `. , ? !` and apostrophes. `!` only if the script has it.
+2. Numbers, years, symbols and abbreviations are written as spoken: "two thousand eleven", "forty percent", "and colleagues", "versus". Match what the master script intends.
+3. Emphasis markup, quotation marks, italics and ALL CAPS are removed.
+4. A name the model mispronounces may be respelled phonetically **in the VO file only** (`Seligman` → `Selig-man`), logged in `vo_index.md`. The master script keeps the real spelling.
+5. **NEVER** add delivery words, stage directions, `(whispering)`-style notes, tags, emoji, `[pause]`, or anything else not in the script.
+
+### `01_script/vo_index.md`
+One entry per block:
+
+```markdown
+## VO-004
+FILE: VO-004.wav
+NODE: VibeVoice Multiple Speakers
+SLOTS: [1] ANCESTOR_1 → ANCESTOR_1.wav · [2] ANCESTOR_2 → ANCESTOR_2.wav
+LINES: L031–L033
+WORDS: 16
+EST DURATION: 3.400s
+EST PLACEMENT: 00:02:11.300 → 00:02:14.700
+PRONUNCIATION: —
+NOTES: —
+```
+
+`SLOTS` for a narration block reads `NARRATOR → <user's narrator clip>`.
+
+---
+
+## 7. `02_voice_design/characters.md` — character voices only
+
+The narrator's voice already exists and is used in every video. **NEVER** write a narrator entry, narrator description or narrator reference text here.
+
+This file holds one entry per character who speaks in the video. Each entry gives the user what they need to make a **20–30 s reference clip** in any voice-design tool of their choice. That clip is what VibeVoice clones. All text is tool-agnostic plain English.
+
+```markdown
+## ANCESTOR_1
+
+REFERENCE FILE: ANCESTOR_1.wav
+SPEAKS IN: VO-004, VO-011 · 5 lines
+ROLE: The practical one of two ancestors at the fire; answers questions like a tired shift supervisor.
+
+VOICE DESIGN PROMPT:
+An adult man in his forties with a low, slightly gravelly voice and a relaxed, unhurried pace. He sounds dry, patient and faintly bored, as if he has explained this many times before. Plain, neutral accent, clear diction, little pitch movement, sentences that fall flat at the end. Recorded close to the microphone in a quiet, dry room, with no reverb, no background sound and no music.
+
+REFERENCE SCRIPT (read in the voice above, 20–30 s):
+Right, so here's how it works. We keep the fire going until it gets light. Somebody stays awake, and it's usually me. Nobody wanders off, nobody goes to look at the interesting noise. That's it. That's the whole plan. It has worked every night so far, and I'd like to keep it that way. Any questions? No? Good.
+
+CONTRAST: Lower and slower than ANCESTOR_2; flatter than the narrator.
+SEED: <fill after first good take>
+```
+
+Rules for every entry:
+- **VOICE DESIGN PROMPT**: 50–110 words, in this order: age range and voice gender, pitch, texture, pace, accent, attitude and energy, then the fixed recording line ("close to the microphone in a quiet, dry room, with no reverb, no background sound and no music").
+- Describe the **sound**, not the story. No character backstory, no plot.
+- **NEVER** name or imitate a real person, actor, celebrity or character ("sounds like…").
+- No caricatured accents. The comedy comes from modern, tired phrasing, not from the voice.
+- **REFERENCE SCRIPT**: 55–85 words (20–30 s), conversational and in character, with varied intonation: a statement, a question, a short sentence, a longer one. **NEVER** use lines from the video. No shouting, no whispering, no laughing, no sound effects in it.
+- **CONTRAST**: every character MUST differ from every other voice in the video (the narrator included) on at least two of: pitch, age, pace, texture.
+- **Variants** (`ANCESTOR_1__WHISPER`): only when a line cannot work in the base voice. At most one per character, same identity description plus the one change, with its own reference script delivered that way. Warn in the entry that whispered or shouted references are less stable.
+
+---
+
+## 8. Visual rules (apply to moodboard, images, animations and thumbnail)
+
+### Style-agnostic prompts
+Every visual prompt MUST work in any art style the user chooses. The user prepends their own style prefix at generation time.
+
+- **NEVER** use style or medium words: stick figure, cartoon, anime, flat, vector, 2D, 3D, render, photo, photorealistic, realistic, painting, watercolor, sketch, illustration, cinematic, film still, octane, unreal, "in the style of", any artist, studio, film or brand name, lens, camera or film-stock names.
+- Describe **content**: who, doing what, where, lit by what, framed how, and the mood.
+- Colour only when it carries meaning ("the shadow is the only warm-coloured thing in the frame, the colour of firelight"), never as a palette.
+- Describe light by source and direction ("lit from below by a phone screen"), not by look ("moody lighting").
+- **NEVER** put text, letters, numbers, labels, logos or UI in an image or animation. Every word on screen is a `TXT` card added in the editor.
+- Write prompts as positive descriptions. Exclusions go in a separate `NEGATIVE:` field (for models that support one), never as "no X" inside the prompt.
+- Characters, environments and props MUST be named by their moodboard ID **and** their canonical description repeated word for word from the moodboard, because image models don't remember anything between prompts.
+
+### Channel constraints (from the launch decision, apply in any style)
+- **Signature device, every video:** the ancestor-as-shadow. The modern figure's shadow on the wall is a Stone Age ancestor in the same pose, with rough wild hair and a spear, no face detail, no pelts or clothing.
+- The modern figure is an adult with adult proportions (small head, long thin limbs). Faceless in the video; a simple readable face appears only on the thumbnail.
+- Night scenes are near-black with one warm light source. Diagrams sit on a plain light background.
+- **Nothing graphic:** spiders, snakes, blood, needles and injuries are simple, low-detail shapes. No gore, no wounds, no realistic insects or reptiles.
+- **Not children's content in any style:** no round oversized eyes, no cute rounded bodies, no pastel palette, no toy-like props.
+- Original only: no stock footage, memes, screenshots or real people. No echo of a competitor's character design, pelts or daylight earth palette.
+- No lip-sync. Speaking is shown by posture and gesture, never mouth movement.
+
+### Pace and coverage (hard limits)
+- The V1 video track is covered **every millisecond** by exactly one visual (IMG shown as still, or ANM). No gaps, no overlaps.
+- **Stills: 0.6 s ≤ duration < 2.0 s.** No still is shown for 2.000 s or longer. (This overrides the launch decision's measured 2–3 s.)
+- **Animations: 2.0 s ≤ duration < 10.0 s.** Anything shorter than 2.0 s is a still.
+- An animation MUST show new visible motion at least every 2 s; a slow hold that looks static counts as a still and breaks the limit.
+- **Screen-time mix: 45–55 % animation**, the rest stills.
+- For a 10-minute video, expect roughly 150–170 stills and 55–65 animations.
+- A new visual starts at every line start where the subject changes, and mid-line on cue words wherever a line runs over 2 s without an animation.
+
+---
+
+## 9. `03_moodboard/moodboard.md`
+
+The reference sheets generated **before** any shot, so every shot can be generated against them (as reference images, IP-adapter, character references, or just by matching them). All prompts follow Section 8.
+
+Sections, in this order:
+
+```markdown
+# MOODBOARD — V001
+
+## STYLE SLOT
+ART STYLE: [user fills]
+Rules for any style: <the channel constraints from Section 8, restated as they apply to this video>
+
+## LIGHT & COLOUR KEYS
+MB-KEY-01 Night: near-black surroundings, one warm source, figures read as silhouettes against it.
+MB-KEY-02 Diagram: plain light background, one accent colour for the thing that matters.
+MB-KEY-03 Shadow device: the ancestor shadow is the only warm-coloured element in a night frame.
+
+## CHARACTERS
+### MB-CHAR-01 · MODERN (the "you" figure)
+CANONICAL DESCRIPTION: <one sentence, 20–35 words, style-free; this exact sentence is pasted into every shot prompt>
+TURNAROUND PROMPT: <front, three-quarter, side and back views of the same figure standing neutrally, evenly spaced on a plain light background, full body>
+POSE SHEET PROMPT: <the same figure in every pose this video uses, in a grid on a plain background; list them>
+POSES USED: recoil, freeze, flee, asleep, standing, pointing, shrug, sitting, glancing back, cowering
+THUMBNAIL FACE: <only if the thumbnail needs it: the face expression described>
+
+### MB-CHAR-02 · ANCESTOR (shadow and fireside)
+CANONICAL DESCRIPTION: ...
+TURNAROUND PROMPT: ...
+POSE SHEET PROMPT: ...
+SHADOW PROMPT: <the ancestor as a flat shadow on a plain wall, matching MB-CHAR-01's recoil pose>
+
+## ENVIRONMENTS
+### MB-ENV-01 · NIGHT BEDROOM
+DESCRIPTION: <canonical sentence pasted into shot prompts>
+PLATE PROMPT: <the empty environment, wide establishing view, key props placed, light source named>
+
+## PROPS
+### MB-PROP-01 · HOUSE SPIDER
+DESCRIPTION: <canonical sentence>
+PROMPT: <the prop alone, centred on a plain background>
+
+## RECURRING DEVICES
+### MB-DEV-01 · ALARM METER
+DESCRIPTION: <a simple vertical gauge with two marked levels...>
+PROMPT: <the empty device on a plain background>
+EDITOR NOTE: <what the editor animates: fill level, labels via TXT>
+```
+
+Rules:
+- Every character, environment, prop and device used in any shot has an entry. Nothing appears in a shot without one.
+- Channel defaults from the launch decision: poses recoil, freeze, flee, asleep, standing, pointing, shrug, sitting, glancing back, cowering; environments night bedroom, night savannah with a fire, plain diagram plate, cliff edge, water, stage; props spider, snake, moon-phase bar, lion eyes in darkness, alarm meter, simple needle, crowd silhouettes, fire. Include only those this video uses, and add new ones as needed.
+- Canonical descriptions are fixed once written. Changing one means regenerating every shot that uses it, so flag it to the user instead.
+
+---
+
+## 10. `04_images/images.md`
+
+One entry per image, in timeline order. An image is used as a still, as the start frame of an animation, or both.
+
+```markdown
+## IMG-004
+USE: START-FRAME (ANM-002)
+ANCHOR: L003
+SHOWN AS STILL: —
+REFS: MB-CHAR-01, MB-ENV-01, MB-KEY-01
+SHOT: medium shot, eye level, figure on the left third
+PROMPT: A slim adult figure with a small head and long thin limbs lies on its back in a narrow bed, blanket pulled up to the chin. A small, plain bedroom at night, lit only by a phone screen on the bedside table glowing from below; the rest of the room is dark. On the wall behind the bed, the figure's shadow is the shape of an early human lying the same way, with wild hair and a spear beside it, the only warm-coloured thing in the frame, the colour of firelight. Medium shot at eye level, bed on the left third, open doorway at the right edge. Silent, tense. 16:9.
+NEGATIVE: text, letters, watermark, logo, blood, gore, detailed face
+```
+
+```markdown
+## IMG-005
+USE: STILL
+ANCHOR: L004@"built"
+SHOWN AS STILL: 1.400s · EST
+REFS: ...
+SHOT: ...
+PROMPT: ...
+NEGATIVE: ...
+```
+
+Rules:
+- `USE` is `STILL`, `START-FRAME (ANM-###)` or `STILL + START-FRAME (ANM-###)`.
+- `SHOWN AS STILL` is the on-screen duration, or `—` for start-frame-only images.
+- **PROMPT**: 50–110 words, one paragraph, fixed order: subject (canonical description) → action or pose → setting (canonical description) → light source and direction → composition (shot size, angle, placement) → mood → aspect ratio.
+- Shot sizes vary: wide, medium, close-up, extreme close-up, overhead, low angle, object shot, diagram. No more than three consecutive images of the same shot size.
+- Diagrams (maps, graphs, meters, comparisons) are described as arrangements of shapes on a plain background; every number or label on them is a `TXT` card.
+- **Start frames** are composed for the motion that follows: leave room in the frame for where the subject will move.
+
+### `04_images/thumbnail.md`
+- Use the thumbnail spec from the brief or launch decision exactly if one exists. Otherwise design one: one figure, one focal point, at most three words of text, black plus two colours, readable at small size.
+- Same prompt rules as images. The thumbnail text is listed separately under `TEXT (added in editor):` with its placement.
+- **MUST** list where each thumbnail element appears in the video (`spider → IMG-088`). An element that doesn't appear in the video is not allowed.
+- **NEVER**: a grid or row of many items, realistic creepy imagery, a children's-cartoon look, or words repeated from the title.
+
+---
+
+## 11. `05_animations/animations.md` — image-to-video
+
+Each animation is generated from its source image as the first frame. The prompt describes **only what moves**: the image already fixes style, character, setting and light.
+
+```markdown
+## ANM-002
+SOURCE IMAGE: IMG-004
+ANCHOR: L003
+DURATION: 4.200s · EST
+GENERATE: 5s (trim in editor)
+PROMPT: The figure in the bed slowly lifts its head from the pillow and turns toward the open doorway, then holds still. The phone glow on the bedside table flickers faintly. On the wall, the shadow lifts its head at the same moment, a fraction later. The camera pushes in slowly toward the bed. Slow, tense pace.
+END STATE: Head raised and turned to the doorway, the shadow matching, holding still.
+NEGATIVE: morphing, extra limbs, new characters, text, scene cut, camera shake
+```
+
+Rules:
+- **PROMPT**: 25–70 words, in this order: primary motion (one clear action) → secondary motion (one or two small things) → camera move (one, or "static camera") → pace.
+- One action per clip. No scene cuts, no new characters entering, no transformations the start frame can't support.
+- Prefer motion that holds up across styles: head turns, flinches, recoils, freezing, pointing, sitting up, shadows moving, fire flicker, a meter filling, a slow push-in or pan. Avoid fast full-body locomotion, walking cycles, detailed hand work, crowds moving and anything that needs lip-sync.
+- **Never re-describe style or appearance** beyond naming the subject ("the figure", "the shadow"). Continuity comes from the source image.
+- `GENERATE` is at least the used duration, rounded up to the model's clip length. Use the `DURATION`, trim the rest.
+- `END STATE` is written so the next visual can start from it.
+
+---
+
+## 12. `06_sfx/sfx.md` — Stable Audio 3
+
+Use Stable Audio 3 **small-sfx** for effects and ambience (up to 2:00 per generation); **medium** only when a sound needs more structure.
+
+```markdown
+## SFX-001
+ANCHOR: L001@"sound"
+TYPE: FOLEY
+ROLE: FEATURE
+GENERATE DURATION: 2.0s
+PROMPT: TrackType: SFX. A single slow creak of an old wooden floorboard under slight weight, rising in pitch then stopping abruptly, with a short natural decay. Recorded close with a small-diaphragm microphone in a small, quiet carpeted bedroom.
+NEGATIVE: music, speech, singing
+```
+
+```markdown
+## AMB-001
+ANCHOR: L010 → ends at L024
+TYPE: ENVIRONMENT
+ROLE: BED
+GENERATE DURATION: 60.0s (loop in editor)
+PROMPT: TrackType: SFX. An open grassland at night: a steady bed of distant crickets and insects, a light wind moving through dry grass, and a small wood fire crackling close by with occasional soft pops. Wide natural stereo field recording, even level throughout, suitable for looping.
+NEGATIVE: music, speech, animal calls in the foreground
+```
+
+Rules:
+- **PROMPT** always begins `TrackType: SFX.`, then 1–3 sentences in this order: sound source (what physically makes it) → action and timing (attack, how many times, how it decays) → recording (mic distance, room or space) → processing only if wanted.
+- Positive description only. "no music" goes in `NEGATIVE:`, not in the prompt.
+- **GENERATE DURATION** = the sound's natural length + 0.5 s tail. Events 0.3–10 s. Ambience beds up to 120 s, looped in the editor.
+- Separate layers get separate IDs: a creak and a heartbeat under the same line are `SFX-004` and `SFX-005`.
+- `TYPE`: FOLEY · IMPACT · ENVIRONMENT · ANIMAL · WEATHER · CROWD · TRANSITION · ABSTRACT.
+- `ROLE`: FEATURE (heard clearly, usually between lines) · SUPPORT (under the voice) · BED (ambience, far under the voice). The editor sets levels by role; VO always wins.
+- **Density:** one ambience bed per location change, and about one event SFX every 15–30 s. Only where the script cues a physical sound or a moment that lands on it. No SFX for its own sake.
+- No voices, words or screams in SFX. Non-verbal crowd murmur only as a BED.
+- **Music:** only when the user asks. Then `MUS-###` entries under a `# MUSIC` heading in the same file, `TrackType: Music`, described by genre, instruments, mood, BPM and arrangement, and never under the cold open's first line. The upload notes MUST say music is AI-generated.
+
+---
+
+## 13. On-screen text (`TXT`)
+
+Text cards are made in the editor, never in images. They are listed in `script.md` on the line where they start and in `timeline.csv` on track V2.
+
+```text
+TXT-003 · ANCHOR: L005@"settings" · DURATION: 2.500s · TEXT: FACTORY SETTINGS: STONE AGE · PLACEMENT: lower third
+```
+
+Rules:
+- 2–5 words per card, all caps allowed. Duration 1.5–4.0 s.
+- **Spacing: a text card starts every 15–30 s** across the whole video (launch decision). Segment name cards in list videos count.
+- Numbers and labels that belong on diagrams are text cards too.
+- A card never repeats the sentence being spoken word for word. It names, labels or counts.
+
+---
+
+## 14. `07_timeline/timeline.csv`
+
+The file the editor works from. UTF-8, comma-separated, one header row, sorted by `start` then `track`.
+
+```csv
+id,track,type,start,end,duration,anchor,source,file,lines,notes
+VO-001,A1,VO,00:00:00.000,00:00:05.000,5.000,L001,,VO-001.wav,L001-L002,narration
+L001,REF,LINE,00:00:00.000,00:00:03.600,3.600,L001,,,L001,NARRATOR
+IMG-001,V1,IMG,00:00:00.000,00:00:01.500,1.500,L001,,IMG-001.png,L001,
+SFX-001,A3,SFX,00:00:01.500,00:00:03.500,2.000,"L001@""sound""",,SFX-001.wav,L001,FEATURE
+ANM-001,V1,ANM,00:00:01.500,00:00:05.000,3.500,"L001@""sound""",IMG-002,ANM-001.mp4,L001-L002,
+H001,A1,HOLD,00:00:05.000,00:00:05.600,0.600,H001,,,,
+IMG-003,V1,IMG,00:00:05.000,00:00:05.600,0.600,H001,,IMG-003.png,,
+VO-002,A1,VO,00:00:05.600,00:00:19.800,14.200,L003,,VO-002.wav,L003-L006,narration
+TXT-001,V2,TXT,00:00:07.200,00:00:09.700,2.500,"L004@""settings""",,,L004,FACTORY SETTINGS: STONE AGE
+```
+
+Tracks: `V1` images and animations · `V2` text cards · `A1` narration VO and holds · `A2` dialogue VO · `A3` SFX · `A4` ambience · `A5` music · `REF` line reference rows (not placed in the edit).
+
+Rules:
+- Every asset in every file has exactly one row. Every row's ID exists in its file.
+- `end` = `start` + `duration`, to the millisecond.
+- Fields containing commas or quotes are quoted CSV-style.
+- Ambience rows span their full placement; the editor loops the file.
+
+---
+
+## 15. Workflow
+
+1. Receive the finished script, its verify list and uncertainty note from the youtube-script step. Do not start from a draft.
+2. Fill `brief.md` header fields: title, target, WPM, format.
+3. Split the script into `L###` lines (Section 5 rules) and add holds.
+4. Group lines into VO blocks, write `vo/VO-###.txt` with the normalization rules, and fill `vo_index.md`.
+5. Compute estimated timings for every line and the segment map.
+6. Write `characters.md` for every non-narrator speaker.
+7. Write `moodboard.md` for every character, environment, prop and device the video needs.
+8. Plan the shot list line by line: which visual starts where (anchors), still or animation, keeping to the limits in Section 8.
+9. Write `images.md`, `thumbnail.md` and `animations.md`.
+10. Write `sfx.md` and the text cards.
+11. Build `timeline.csv`, then compute the counts and percentages for `brief.md`.
+12. Run the validation below. Fix and re-run until everything passes.
+13. Deliver the package. When the user later gives VO timings, run the re-time procedure (Section 3) and deliver `v2-retimed`.
+
+---
+
+## 16. Validation (every item MUST pass)
+
+**Structure**
+- [ ] Exact folder tree and filenames from Section 1; nothing extra, nothing empty.
+- [ ] One script, no variations.
+- [ ] Every ID is unique, correctly formatted and in timeline order.
+
+**Script and VO**
+- [ ] Every narrator line is one sentence; every dialogue line is one turn.
+- [ ] Every line has TIME, SPEAKER, VO, TEXT, VISUALS, SFX and TXT fields.
+- [ ] Every line belongs to exactly one VO block; blocks are ≤ 200 words; ≤ 4 speakers per block; ≤ 3 designed character voices in the video.
+- [ ] VO files contain only speakable text: no IDs, notes, tags, parentheses, `[pause]`, symbols, digits or disallowed punctuation.
+- [ ] No block starts with "Welcome", "Hello", "Hi" or "However".
+- [ ] Every respelling is logged in `vo_index.md`.
+
+**Voices**
+- [ ] No narrator entry in `characters.md`.
+- [ ] Every non-narrator speaker has an entry with prompt (50–110 words), reference script (55–85 words, not from the video) and contrast note.
+- [ ] No real-person or celebrity references.
+
+**Visuals**
+- [ ] V1 has no gaps or overlaps from `00:00:00.000` to the last line's end.
+- [ ] Every still shown 0.6 s ≤ d < 2.0 s. Every animation 2.0 s ≤ d < 10.0 s.
+- [ ] Animation share of screen time is 45–55 %.
+- [ ] Every animation names an existing source image.
+- [ ] Every prompt is free of style/medium words, text, logos and negations inside the prompt.
+- [ ] Every shot's characters, environments and props exist in the moodboard, with canonical descriptions pasted in verbatim.
+- [ ] Ancestor-as-shadow device appears in the video.
+- [ ] Nothing graphic; nothing that reads as children's content.
+- [ ] Every thumbnail element appears in the video, and the title's question is answered.
+
+**Sound and text**
+- [ ] Every SFX prompt starts with `TrackType: SFX.`, has source, action and recording, and a generate duration.
+- [ ] No music unless the user asked.
+- [ ] Text cards start every 15–30 s, 2–5 words, 1.5–4.0 s each.
+
+**Timing**
+- [ ] Every timestamp is `HH:MM:SS.mmm`; every `end` = `start` + `duration`.
+- [ ] Every visual, SFX and text card has an anchor that points to an existing line or hold and cue word.
+- [ ] Estimated runtime is within ±10 % of the target.
+- [ ] Cold open ends by 00:00:30; the first named evidence starts by 00:02:00.
+- [ ] `brief.md` counts match `timeline.csv`.
+
+Report the validation result at the end of delivery as a short pass list. If anything had to be sent back to the script step, say what and why.
