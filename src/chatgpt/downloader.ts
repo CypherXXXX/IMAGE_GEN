@@ -1,7 +1,5 @@
 import { Page, Response as PlaywrightResponse } from 'playwright';
-import { SELECTORS } from './selectors';
 import { getLogger } from '../utils/logger';
-import { snapshotDownloadDir, waitForNewDownload } from '../download/download-watcher';
 import path from 'path';
 import fs from 'fs';
 
@@ -141,9 +139,9 @@ export function createImageInterceptor(page: Page): {
 export async function downloadGeneratedImage(
   page: Page,
   outputPath: string,
-  downloadDir: string,
+  _downloadDir: string,
   interceptor?: { getResult: () => InterceptedImage | null; dispose: () => void },
-  timeoutMs: number = 60_000
+  _timeoutMs: number = 60_000
 ): Promise<DownloadResult> {
   const logger = getLogger();
 
@@ -184,22 +182,6 @@ export async function downloadGeneratedImage(
     return domResult;
   }
   logger.warn('downloader', `Strategy 2 failed: ${domResult.error}`);
-
-  // ── Strategy 3: Hover + click download button ──
-  logger.info('downloader', 'Strategy 3 (button click): Trying hover + download button…');
-  const snapshot = snapshotDownloadDir(downloadDir);
-  const clicked = await strategyClickDownload(page);
-
-  if (clicked) {
-    logger.info('downloader', 'Strategy 3: Button clicked — watching for downloaded file…');
-    const watchResult = await waitForNewDownload(downloadDir, snapshot, timeoutMs);
-    if (watchResult.success) {
-      return finalizeFile(watchResult.filePath, outputPath, 'button_click');
-    }
-    logger.warn('downloader', `Strategy 3: Button clicked but no file appeared: ${watchResult.error}`);
-  } else {
-    logger.warn('downloader', 'Strategy 3: Could not find/click any download button');
-  }
 
   logger.error('downloader', '❌ All download strategies failed');
   return { success: false, filePath: '', fileSize: 0, error: 'All download strategies failed', strategy: 'none' };
@@ -274,130 +256,6 @@ async function strategyDomUrlExtraction(page: Page, outputPath: string): Promise
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Strategy 3: Hover + Click Download Button
-// ═══════════════════════════════════════════════════════════════
-
-async function strategyClickDownload(page: Page): Promise<boolean> {
-  const logger = getLogger();
-
-  try {
-    // Find last assistant message and its image
-    const assistantMsgs = page.locator(SELECTORS.CHAT.ASSISTANT_MESSAGE);
-    const msgCount = await assistantMsgs.count();
-    if (msgCount === 0) return false;
-
-    const lastMsg = assistantMsgs.nth(msgCount - 1);
-    const images = lastMsg.locator('img[src]');
-    const imgCount = await images.count();
-
-    if (imgCount > 0) {
-      // Hover the image to reveal action buttons
-      await images.nth(imgCount - 1).hover({ force: true });
-      await page.waitForTimeout(1500);
-    }
-
-    // Try aria-label selectors
-    const ariaSelectors = [
-      'button[aria-label="Download"]',
-      'button[aria-label="download"]',
-      'button[aria-label="Download image"]',
-      'a[download]',
-    ];
-
-    for (const sel of ariaSelectors) {
-      try {
-        const btn = page.locator(sel).first();
-        if (await btn.isVisible({ timeout: 800 })) {
-          await btn.click();
-          await page.waitForTimeout(1500);
-          logger.info('downloader', `Clicked download via: ${sel}`);
-          return true;
-        }
-      } catch { /* continue */ }
-    }
-
-    // Try finding by scanning buttons in page JS
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval
-    const foundByJs = await page.evaluate(`
-      (() => {
-        var btns = document.querySelectorAll('button');
-        for (var i = 0; i < btns.length; i++) {
-          var label = (btns[i].getAttribute('aria-label') || '').toLowerCase();
-          var title = (btns[i].getAttribute('title') || '').toLowerCase();
-          if (label.includes('download') || title.includes('download')) {
-            btns[i].setAttribute('data-auto-dl', 'true');
-            return true;
-          }
-        }
-        return false;
-      })()
-    `);
-
-    if (foundByJs) {
-      const btn = page.locator('[data-auto-dl="true"]').first();
-      if (await btn.isVisible({ timeout: 1000 })) {
-        await btn.click();
-        await page.waitForTimeout(1500);
-        // eslint-disable-next-line @typescript-eslint/no-implied-eval
-        await page.evaluate(`(() => { var el = document.querySelector('[data-auto-dl]'); if (el) el.removeAttribute('data-auto-dl'); })()`);
-        logger.info('downloader', 'Clicked download via JS scan');
-        return true;
-      }
-    }
-
-    // Try action bar positional approach
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval
-    const markedByPosition = await page.evaluate(`
-      (() => {
-        var messages = document.querySelectorAll('[data-message-author-role="assistant"]');
-        if (!messages.length) return null;
-        var lastMsg = messages[messages.length - 1];
-
-        var container = lastMsg;
-        for (var i = 0; i < 5; i++) { if (container.parentElement) container = container.parentElement; }
-
-        var allDivs = container.querySelectorAll('div');
-        for (var d = 0; d < allDivs.length; d++) {
-          var group = allDivs[d];
-          var buttons = group.querySelectorAll(':scope > button, :scope > span > button');
-          if (buttons.length >= 4 && buttons.length <= 8) {
-            var allSvg = true;
-            for (var b = 0; b < buttons.length; b++) {
-              if (!buttons[b].querySelector('svg') || (buttons[b].textContent || '').trim().length > 2) allSvg = false;
-            }
-            if (allSvg) {
-              // Found the action bar. Download is typically 5th button.
-              var idx = buttons.length >= 6 ? 4 : buttons.length >= 5 ? 3 : buttons.length - 2;
-              buttons[idx].setAttribute('data-auto-dl-pos', 'true');
-              return { total: buttons.length, idx: idx };
-            }
-          }
-        }
-        return null;
-      })()
-    `);
-
-    if (markedByPosition) {
-      const pos = markedByPosition as { total: number; idx: number };
-      const btn = page.locator('[data-auto-dl-pos="true"]').first();
-      if (await btn.isVisible({ timeout: 1000 })) {
-        await btn.click();
-        await page.waitForTimeout(1500);
-        // eslint-disable-next-line @typescript-eslint/no-implied-eval
-        await page.evaluate(`(() => { var el = document.querySelector('[data-auto-dl-pos]'); if (el) el.removeAttribute('data-auto-dl-pos'); })()`);
-        logger.info('downloader', `Clicked download via action bar position (idx ${pos.idx} of ${pos.total})`);
-        return true;
-      }
-    }
-
-  } catch (err) {
-    logger.debug('downloader', `Button click strategy failed: ${err}`);
-  }
-
-  return false;
-}
-
-// ═══════════════════════════════════════════════════════════════
 // Helpers
 // ═══════════════════════════════════════════════════════════════
 
@@ -457,14 +315,6 @@ function saveBuffer(buffer: Buffer, outputPath: string, contentType: string): Do
     fs.mkdirSync(path.dirname(outputPath), { recursive: true });
     fs.writeFileSync(outputPath, buffer);
 
-    // Also copy to downloaded_images for gallery
-    try {
-      const projectRoot = path.resolve(path.dirname(outputPath), '..', '..');
-      const dlDir = path.join(projectRoot, 'downloaded_images');
-      fs.mkdirSync(dlDir, { recursive: true });
-      fs.copyFileSync(outputPath, path.join(dlDir, path.basename(outputPath)));
-    } catch { /* non-critical */ }
-
     return {
       success: true,
       filePath: outputPath,
@@ -479,15 +329,31 @@ function saveBuffer(buffer: Buffer, outputPath: string, contentType: string): Do
 }
 
 /**
- * Copy a downloaded file to the batch output path.
+ * Save an image buffer to the output directory with the given imageId.
+ * This is used to save to SCRIPT_IMAGES or MOODBOARD_IMAGES with proper naming.
  */
-function finalizeFile(srcPath: string, outputPath: string, strategy: string): DownloadResult {
+export function saveToOutputDir(buffer: Buffer, outputDir: string, imageId: string, contentType: string = 'image/png'): DownloadResult {
+  let ext = '.png';
+  if (contentType.includes('webp')) ext = '.webp';
+  else if (contentType.includes('jpeg') || contentType.includes('jpg')) ext = '.jpg';
+
+  const outputPath = path.join(outputDir, `${imageId}${ext}`);
+  return saveBuffer(buffer, outputPath, contentType);
+}
+
+/**
+ * Copy an already-saved image to the output directory with the proper imageId name.
+ */
+export function copyToOutputDir(srcPath: string, outputDir: string, imageId: string): DownloadResult {
   try {
-    const stat = fs.statSync(srcPath);
-    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-    fs.copyFileSync(srcPath, outputPath);
-    return { success: true, filePath: outputPath, fileSize: stat.size, error: '', strategy };
+    const ext = path.extname(srcPath) || '.png';
+    const destPath = path.join(outputDir, `${imageId}${ext}`);
+    fs.mkdirSync(outputDir, { recursive: true });
+    fs.copyFileSync(srcPath, destPath);
+    const stat = fs.statSync(destPath);
+    return { success: true, filePath: destPath, fileSize: stat.size, error: '', strategy: 'copy' };
   } catch (err) {
-    return { success: false, filePath: '', fileSize: 0, error: `Finalize error: ${err}`, strategy };
+    return { success: false, filePath: '', fileSize: 0, error: `Copy error: ${err}`, strategy: 'copy' };
   }
 }
+

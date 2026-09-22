@@ -30,6 +30,7 @@ export class QueuePersistence {
       batchId: '',
       batchName: '',
       batchFolder: '',
+      batchType: 'script',
       state: 'setup',
       totalPrompts: 0,
       completedCount: 0,
@@ -43,6 +44,7 @@ export class QueuePersistence {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       completedAt: '',
+      outputDir: '',
     };
   }
 
@@ -76,7 +78,7 @@ export class QueuePersistence {
   /**
    * Initialize jobs array from parsed prompts.
    */
-  initializeJobs(promptCount: number, prompts: { index: number; originalText: string }[]): void {
+  initializeJobs(promptCount: number, prompts: { index: number; originalText: string; imageId?: string }[]): void {
     this.progress.totalPrompts = promptCount;
     this.progress.jobs = prompts.map((p) => ({
       promptIndex: p.index,
@@ -87,6 +89,7 @@ export class QueuePersistence {
       imagePath: '',
       imageFilename: '',
       imageUrl: '',
+      imageId: p.imageId || `IMG-${String(p.index).padStart(3, '0')}`,
       chatNumber: 0,
       retryCount: 0,
       error: '',

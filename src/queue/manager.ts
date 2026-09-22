@@ -40,7 +40,7 @@ export class QueueManager extends EventEmitter {
    * Initialize the queue with prompts.
    */
   initialize(batchId: string, batchName: string, batchFolder: string,
-    prompts: { index: number; originalText: string }[]): void {
+    prompts: { index: number; originalText: string; imageId?: string }[]): void {
     this.persistence.setProgress({
       batchId,
       batchName,
@@ -177,7 +177,7 @@ export class QueueManager extends EventEmitter {
   /**
    * Retry a specific failed job.
    */
-  retryJob(promptIndex: number): void {
+  retryJob(promptIndex: number): boolean {
     const job = this.persistence.getJob(promptIndex);
     if (job && (job.state === 'failed' || job.state === 'cancelled')) {
       this.persistence.updateJob(promptIndex, {
@@ -185,7 +185,10 @@ export class QueueManager extends EventEmitter {
         error: '',
         retryCount: job.retryCount + 1,
       });
+      this.emitEvent({ type: 'job_retry_requested', promptIndex });
+      return true;
     }
+    return false;
   }
 
   /**

@@ -1,6 +1,6 @@
 /**
  * Image Batch Studio — Dashboard Application
- * Complete frontend JS with sidebar nav, WebSocket, gallery, lightbox.
+ * Complete frontend JS with sidebar nav, WebSocket, gallery, lightbox, moodboard.
  */
 
 // ─── State ───
@@ -18,6 +18,11 @@ let reviewPromptIndex = 0;
 let galleryBatches = [];
 let lightboxImages = [];
 let lightboxIndex = 0;
+let lightboxBatchName = '';
+
+// Moodboard state
+let mbParsedPrompts = [];
+let mbReferenceImages = [];
 
 // ─── Init ───
 document.addEventListener('DOMContentLoaded', () => {
@@ -27,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupQueue();
   setupGallery();
   setupLightbox();
+  setupMoodboard();
   connectWebSocket();
 });
 
@@ -47,16 +53,17 @@ function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + name));
 
   const idx = stepOrder.indexOf(name);
-  document.querySelectorAll('.step').forEach((s, i) => {
-    s.classList.remove('done', 'current');
-    if (i < idx) s.classList.add('done');
-    else if (i === idx) s.classList.add('current');
-  });
-  document.querySelectorAll('.step-line').forEach((l, i) => {
-    l.classList.toggle('done', i < idx);
-  });
+  if (idx >= 0) {
+    document.querySelectorAll('.step').forEach((s, i) => {
+      s.classList.remove('done', 'current');
+      if (i < idx) s.classList.add('done');
+      else if (i === idx) s.classList.add('current');
+    });
+    document.querySelectorAll('.step-line').forEach((l, i) => {
+      l.classList.toggle('done', i < idx);
+    });
+  }
 
-  // Refresh gallery when switching to it
   if (name === 'gallery') loadGallery();
 }
 
@@ -67,7 +74,7 @@ function updateContextBar() {
     el.textContent = currentBatchName;
     const refCount = referenceImages.length;
     const promptCount = parsedPrompts.length;
-    sub.textContent = `${promptCount} prompts · ${refCount} references · output → /batches/${currentBatchName}/`;
+    sub.textContent = `${promptCount} prompts · ${refCount} references · 30 per chat`;
   }
 }
 
@@ -119,6 +126,11 @@ function handleEvent(event) {
       refreshProgress();
       break;
 
+    case 'job_retry_requested':
+      updateJobState(event.promptIndex, 'generating');
+      showToast(`Retrying image ${event.promptIndex}…`, 'info');
+      break;
+
     case 'awaiting_review':
       showReviewReady(event.imagePath, event.promptIndex);
       showPage('review');
@@ -155,14 +167,6 @@ function handleEvent(event) {
       showToast(`Batch complete! ${event.totalCompleted} images generated`, 'success');
       break;
 
-    case 'rate_limit_detected':
-      showToast(`Rate limit: ${event.message}`, 'error');
-      break;
-
-    case 'captcha_detected':
-      showToast('CAPTCHA detected — complete it in the browser', 'warning');
-      break;
-
     case 'progress_update':
       updateProgress(event.progress);
       break;
@@ -191,19 +195,49 @@ function setupSetup() {
     }
   });
 
-  // Load file
-  document.getElementById('btn-load-file').addEventListener('click', () => {
+  // Scan moodboard images (for REFS on setup page)
+  document.getElementById('btn-scan-moodboard-images').addEventListener('click', async () => {
+    try {
+      const res = await fetch('/api/scan-folder/moodboard');
+      const data = await res.json();
+      const images = data.images || [];
+      renderSetupMoodboardImages(images);
+      showToast(`Found ${images.length} moodboard image(s) in MOODBOARD_IMAGES/`, 'info');
+    } catch (err) {
+      showToast(`Scan failed: ${err.message}`, 'error');
+    }
+  });
+
+  // Fetch from IMAGE_PROMPTS folder
+  document.getElementById('btn-fetch-image-prompts').addEventListener('click', async () => {
+    try {
+      const res = await fetch('/api/image-prompts/read');
+      const data = await res.json();
+      if (data.content) {
+        document.getElementById('prompts-input').value = data.content;
+        parsedPrompts = data.prompts || [];
+        const pill = document.getElementById('prompt-count-pill');
+        pill.style.display = '';
+        pill.textContent = `${parsedPrompts.length} parsed`;
+        updateChecklist();
+        showToast(`Loaded ${parsedPrompts.length} prompts from IMAGE_PROMPTS/`, 'success');
+      } else {
+        showToast('No prompts found in IMAGE_PROMPTS/ folder', 'warning');
+      }
+    } catch (err) {
+      showToast(`Fetch failed: ${err.message}`, 'error');
+    }
+  });
+
+  // Upload ZIP file (setup page — looks for images.md)
+  document.getElementById('btn-load-zip').addEventListener('click', () => {
     document.getElementById('file-input').click();
   });
-  document.getElementById('file-input').addEventListener('change', (e) => {
+  document.getElementById('file-input').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      document.getElementById('prompts-input').value = ev.target.result;
-      showToast(`Loaded: ${file.name}`, 'success');
-    };
-    reader.readAsText(file);
+    await uploadZipFile(file, 'images', 'prompts-input', 'prompt-count-pill');
+    e.target.value = ''; // reset
   });
 
   // Parse prompts
@@ -245,16 +279,17 @@ function setupSetup() {
 
       document.getElementById('browser-status-row').style.display = 'flex';
       document.getElementById('browser-status-text').textContent = `Connected to ChatGPT — ${data.accountName || 'logged in'}`;
-      btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M5 12l5 5L20 7"/></svg>Session ready`;
+      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M5 12l5 5L20 7"/></svg>Session ready';
       updateChecklist();
+      updateMBChecklist();
     } catch (err) {
       showToast(`Browser launch failed: ${err.message}`, 'error');
-      btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Launch browser`;
+      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Launch browser';
     }
     btn.disabled = false;
   });
 
-  // Start batch
+  // Start batch — always batchType='script'
   document.getElementById('btn-start-batch').addEventListener('click', async () => {
     currentBatchName = document.getElementById('batch-name').value || 'batch';
     const promptsText = document.getElementById('prompts-input').value;
@@ -268,6 +303,7 @@ function setupSetup() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           batchName: currentBatchName,
+          batchType: 'script',
           promptsText,
           referenceImagePaths: referenceImages.map(i => i.absolutePath),
           browserType,
@@ -300,6 +336,17 @@ function renderReferenceThumbs() {
   document.getElementById('ref-count').textContent = `${referenceImages.length} references detected`;
 }
 
+function renderSetupMoodboardImages(images) {
+  const grid = document.getElementById('setup-moodboard-gallery');
+  grid.innerHTML = images.map(img =>
+    `<div class="thumb" style="position:relative;">
+      <img src="/api/output-image/moodboard/${encodeURIComponent(img.filename)}/download" alt="${esc(img.imageId)}" loading="lazy">
+      <div style="position:absolute; bottom:2px; left:2px; right:2px; background:rgba(0,0,0,0.6); color:#fff; font-size:10px; padding:2px 4px; border-radius:3px; text-align:center;">${esc(img.imageId)}</div>
+    </div>`
+  ).join('');
+  document.getElementById('setup-moodboard-count').textContent = `${images.length} moodboard images found`;
+}
+
 function updateChecklist() {
   const refs = referenceImages.length > 0;
   const browser = document.getElementById('browser-status-row').style.display !== 'none';
@@ -314,12 +361,58 @@ function updateChecklist() {
 
 function setCheckDone(id, done, text) {
   const el = document.getElementById(id);
+  if (!el) return;
   if (done) {
     el.className = 'check-row done';
     el.innerHTML = `<span class="check-mark"><svg viewBox="0 0 24 24" fill="none" stroke-width="3"><path d="M4 12l5 5L20 6"/></svg></span>${text}`;
   } else {
     el.className = 'check-row';
     el.innerHTML = `<span class="check-mark"></span>${text}`;
+  }
+}
+
+// ═══════════════════════════════════════════
+// ZIP Upload (shared between setup & moodboard)
+// ═══════════════════════════════════════════
+async function uploadZipFile(file, target, textareaId, pillId) {
+  const formData = new FormData();
+  formData.append('zipfile', file);
+  formData.append('target', target);
+
+  try {
+    showToast(`Uploading ${file.name}…`, 'info');
+    const res = await fetch('/api/upload-zip', {
+      method: 'POST',
+      body: formData,
+    });
+    const data = await res.json();
+
+    if (data.error) {
+      showToast(`ZIP error: ${data.error}`, 'error');
+      if (data.availableFiles) {
+        console.log('Files found in ZIP:', data.availableFiles);
+      }
+      return;
+    }
+
+    document.getElementById(textareaId).value = data.content;
+
+    const prompts = data.prompts || [];
+    if (target === 'images') {
+      parsedPrompts = prompts;
+      updateChecklist();
+    } else {
+      mbParsedPrompts = prompts;
+      updateMBChecklist();
+    }
+
+    const pill = document.getElementById(pillId);
+    pill.style.display = '';
+    pill.textContent = `${prompts.length} parsed`;
+
+    showToast(`Extracted ${data.filename} — ${prompts.length} prompts found`, 'success');
+  } catch (err) {
+    showToast(`Upload failed: ${err.message}`, 'error');
   }
 }
 
@@ -390,7 +483,6 @@ function showReviewReady(imagePath, promptIndex) {
   reviewImagePath = imagePath;
   reviewPromptIndex = promptIndex;
 
-  // Build image URL from batch path
   const imgUrl = buildImageUrl(imagePath);
   document.getElementById('review-image').src = imgUrl;
 
@@ -423,14 +515,18 @@ function renderReviewReferences(containerId) {
 }
 
 function buildImageUrl(imagePath) {
-  // Handle both Windows and Unix paths
+  if (!imagePath) return '';
   if (imagePath.includes('batches\\') || imagePath.includes('batches/')) {
-    const relative = imagePath.split(/batches[\\/]/)[1];
+    const relative = imagePath.split(/batches[/\\]/)[1];
     if (relative) return `/batches/${relative.replace(/\\/g, '/')}`;
   }
-  if (imagePath.includes('downloaded_images')) {
-    const filename = imagePath.split(/[\\/]/).pop();
-    return `/downloaded-images/${filename}`;
+  if (imagePath.includes('MOODBOARD_IMAGES')) {
+    const filename = imagePath.split(/[/\\]/).pop();
+    return `/api/output-image/moodboard/${filename}/download`;
+  }
+  if (imagePath.includes('SCRIPT_IMAGES')) {
+    const filename = imagePath.split(/[/\\]/).pop();
+    return `/api/output-image/script/${filename}/download`;
   }
   return imagePath;
 }
@@ -489,26 +585,23 @@ function updateProgress(progress) {
   document.getElementById('q-failed-text').textContent = failed > 0 ? `${failed} failed` : '';
   document.getElementById('q-total-pill').textContent = `${total} total`;
 
-  // Update queue badge
   const badge = document.getElementById('queue-badge');
   if (progress.state === 'running') {
     badge.style.display = '';
     badge.textContent = `${completed}/${total}`;
   }
 
-  // Status pill
   const statusPill = document.getElementById('q-status-pill');
   const state = progress.state || 'setup';
   statusPill.className = 'pill';
   if (state === 'running') { statusPill.className = 'pill accent pulsing'; statusPill.innerHTML = '<span class="dotm"></span>Running'; }
   else if (state === 'paused') { statusPill.className = 'pill warning'; statusPill.innerHTML = '<span class="dotm"></span>Paused'; }
   else if (state === 'completed') { statusPill.className = 'pill success'; statusPill.innerHTML = '<span class="dotm"></span>Complete'; }
+  else if (state === 'interrupted') { statusPill.className = 'pill warning'; statusPill.innerHTML = '<span class="dotm"></span>Interrupted'; }
   else { statusPill.textContent = state; }
 
-  // Render job list
   renderJobList(progress.jobs || []);
 
-  // Update current job
   const currentJob = (progress.jobs || []).find(j => j.state === 'generating');
   if (currentJob) {
     document.getElementById('q-current-label').textContent = `Prompt ${currentJob.promptIndex} of ${total}`;
@@ -521,7 +614,6 @@ function updateProgress(progress) {
     }
   }
 
-  // Show completed image for the most recent completed job
   const lastCompleted = [...(progress.jobs || [])].reverse().find(j => j.state === 'completed' && j.imagePath);
   if (lastCompleted && !currentJob) {
     document.getElementById('q-current-image').innerHTML = `<img src="${buildImageUrl(lastCompleted.imagePath)}" alt="Last completed">`;
@@ -535,8 +627,21 @@ function updateJobState(promptIndex, state) {
   if (!row) return;
   const pillEl = row.querySelector('.job-pill');
   if (pillEl) {
-    pillEl.className = 'pill ' + getJobPillClass(state);
+    pillEl.className = 'pill job-pill ' + getJobPillClass(state);
     pillEl.innerHTML = getJobPillContent(state);
+  }
+  const actionsEl = row.querySelector('.job-actions');
+  if (state === 'failed' && !actionsEl) {
+    const actions = document.createElement('div');
+    actions.className = 'job-actions';
+    actions.style.opacity = '1';
+    actions.innerHTML = `
+      <button class="btn btn-ghost btn-sm" onclick="retryJob(${promptIndex})">Retry</button>
+      <button class="btn btn-ghost btn-sm" onclick="skipJob(${promptIndex})">Skip</button>
+    `;
+    row.appendChild(actions);
+  } else if (state !== 'failed' && actionsEl) {
+    actionsEl.remove();
   }
 }
 
@@ -544,10 +649,11 @@ function renderJobList(jobs) {
   const container = document.getElementById('job-list');
   container.innerHTML = jobs.map(job => {
     const isActive = job.state === 'generating';
+    const imageId = job.imageId || `IMG-${String(job.promptIndex).padStart(3, '0')}`;
     const name = job.originalPrompt ? job.originalPrompt.substring(0, 40) : `Prompt ${job.promptIndex}`;
     return `
       <div class="job-row${isActive ? ' active' : ''}" data-job-index="${job.promptIndex}">
-        <span class="job-idx">${String(job.promptIndex).padStart(2, '0')}</span>
+        <span class="job-idx">${esc(imageId)}</span>
         <span class="job-name">${esc(name)}</span>
         <span class="pill job-pill ${getJobPillClass(job.state)}">${getJobPillContent(job.state)}</span>
         ${job.state === 'failed' ? `
@@ -589,12 +695,15 @@ function getJobPillContent(state) {
 
 async function retryJob(promptIndex) {
   try {
-    await fetch('/api/batch/retry', {
+    const res = await fetch('/api/batch/retry', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ promptIndex }),
     });
-    showToast(`Retrying prompt ${promptIndex}`, 'info');
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    showToast(`Retrying prompt ${promptIndex} — re-generating with full context…`, 'info');
+    updateJobState(promptIndex, 'generating');
   } catch (err) {
     showToast(`Retry failed: ${err.message}`, 'error');
   }
@@ -619,6 +728,7 @@ async function skipJob(promptIndex) {
 function setupGallery() {
   document.getElementById('btn-refresh-gallery').addEventListener('click', loadGallery);
   document.getElementById('gallery-search').addEventListener('input', filterGallery);
+  document.getElementById('gallery-sort').addEventListener('change', () => renderGalleryBatches(galleryBatches));
   loadGallery();
 }
 
@@ -641,12 +751,24 @@ function filterGallery() {
 
 function renderGalleryBatches(batches) {
   const container = document.getElementById('gallery-batches');
+  const sortOrder = document.getElementById('gallery-sort').value;
 
-  if (batches.length === 0) {
+  const sorted = [...batches].sort((a, b) => {
+    if (sortOrder === 'newest') return b.name.localeCompare(a.name);
+    return a.name.localeCompare(b.name);
+  });
+
+  // FILTER: Only show batches that have at least 1 completed image
+  const nonEmpty = sorted.filter(batch => {
+    const jobs = batch.progress?.jobs || [];
+    return jobs.some(j => j.state === 'completed' && j.imagePath);
+  });
+
+  if (nonEmpty.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-        <h3>No batches yet</h3>
+        <h3>No batches with images yet</h3>
         <p>Start a batch from the Setup page to see images here.</p>
       </div>
     `;
@@ -655,60 +777,51 @@ function renderGalleryBatches(batches) {
   }
 
   let totalImages = 0;
-  container.innerHTML = batches.map(batch => {
+  container.innerHTML = nonEmpty.map(batch => {
     const p = batch.progress;
     const completed = p?.completedCount || 0;
     const total = p?.totalPrompts || 0;
     const state = p?.state || 'unknown';
+    const batchType = p?.batchType || 'script';
     const jobs = p?.jobs || [];
     const completedJobs = jobs.filter(j => j.state === 'completed' && j.imagePath);
     totalImages += completedJobs.length;
 
     const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
-    const progressColor = state === 'completed' ? 'var(--success)' : state === 'paused' || state === 'cancelled' ? 'var(--warning)' : '';
 
     return `
-      <div class="batch-card" id="batch-${esc(batch.name)}">
-        <div class="batch-card-header" onclick="toggleBatch('${esc(batch.name)}')">
-          <div class="batch-card-main">
-            <div class="batch-name-row">
-              <span class="batch-name">${esc(batch.name)}</span>
-              <span class="pill ${getStatePillClass(state)}">${getStatePillContent(state)}</span>
-            </div>
-            <div class="batch-meta">
-              <span>${completedJobs.length} images</span>
-              <span>${total} prompts</span>
-              <span>/batches/${esc(batch.name)}/</span>
-            </div>
-          </div>
-          <div class="batch-progress">
-            <div class="progress-bar"><div class="progress-bar-fill" style="width:${pct}%;${progressColor ? ' background:' + progressColor + ';' : ''}"></div></div>
-            <div class="batch-progress-label">${completed} / ${total}</div>
-          </div>
-          <div class="batch-toggle">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+      <div class="gallery-batch-card" id="batch-${esc(batch.name)}">
+        <div class="gallery-batch-header" onclick="toggleBatch('${esc(batch.name)}')">
+          <span class="gallery-batch-name">${esc(batch.name)}</span>
+          <span class="pill" style="font-size:11px;">${batchType === 'moodboard' ? 'Moodboard' : 'Script'}</span>
+          <div class="gallery-batch-meta">
+            <span class="pill ${getStatePillClass(state)}">${getStatePillContent(state)}</span>
+            <span style="color:var(--text-tertiary); font-size:13px;">${completedJobs.length} / ${total} images</span>
           </div>
         </div>
-        <div class="batch-card-images">
-          ${completedJobs.length > 0 ? `
-            <div class="gallery-grid">
-              ${completedJobs.map((job, idx) => {
-                const imgUrl = buildImageUrl(job.imagePath);
-                return `
-                  <div class="gallery-item" onclick="openLightbox('${esc(batch.name)}', ${idx})">
-                    <img src="${imgUrl}" alt="Image ${job.promptIndex}" loading="lazy">
-                    <div class="gallery-item-label">#${String(job.promptIndex).padStart(2, '0')} ${esc((job.originalPrompt || '').substring(0, 30))}</div>
-                  </div>
-                `;
-              }).join('')}
-            </div>
-          ` : '<div class="gallery-empty">No images generated yet</div>'}
+        <div class="progress-bar" style="height:3px; margin-bottom:16px;">
+          <div class="progress-bar-fill" style="width:${pct}%;"></div>
+        </div>
+        <div class="gallery-grid">
+          ${completedJobs.map((job, idx) => {
+      const imgUrl = buildImageUrl(job.imagePath);
+      const imageId = job.imageId || `IMG-${String(job.promptIndex).padStart(3, '0')}`;
+      return `
+              <div class="gallery-image-card" onclick="openLightbox('${esc(batch.name)}', ${idx})">
+                <img src="${imgUrl}" alt="${esc(imageId)}" loading="lazy">
+                <button class="img-download" onclick="event.stopPropagation(); downloadBatchImage('${esc(batch.name)}', '${esc(job.imageFilename)}')">
+                  <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  ${esc(imageId)}
+                </button>
+              </div>
+            `;
+    }).join('')}
         </div>
       </div>
     `;
   }).join('');
 
-  document.getElementById('gallery-stats').textContent = `${batches.length} batches · ${totalImages} images`;
+  document.getElementById('gallery-stats').textContent = `${nonEmpty.length} batches · ${totalImages} images`;
 }
 
 function getStatePillClass(state) {
@@ -716,6 +829,7 @@ function getStatePillClass(state) {
     case 'completed': return 'success';
     case 'running': return 'accent pulsing';
     case 'paused': case 'cancelled': return 'warning';
+    case 'interrupted': return 'warning';
     case 'failed': return 'danger';
     default: return '';
   }
@@ -726,7 +840,8 @@ function getStatePillContent(state) {
     case 'completed': return 'Completed';
     case 'running': return '<span class="dotm"></span>Running';
     case 'paused': return 'Paused';
-    case 'cancelled': return 'Interrupted';
+    case 'cancelled': return 'Cancelled';
+    case 'interrupted': return 'Interrupted';
     case 'failed': return 'Failed';
     default: return state;
   }
@@ -737,6 +852,17 @@ function toggleBatch(batchName) {
   if (card) card.classList.toggle('expanded');
 }
 
+function downloadBatchImage(batchName, filename) {
+  const url = `/api/batch/${encodeURIComponent(batchName)}/images/${encodeURIComponent(filename)}/download`;
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  showToast(`Downloading ${filename}`, 'info');
+}
+
 // ═══════════════════════════════════════════
 // Lightbox
 // ═══════════════════════════════════════════
@@ -744,13 +870,14 @@ function setupLightbox() {
   document.getElementById('lightbox-close').addEventListener('click', closeLightbox);
   document.getElementById('lightbox-prev').addEventListener('click', () => navigateLightbox(-1));
   document.getElementById('lightbox-next').addEventListener('click', () => navigateLightbox(1));
+  document.getElementById('lightbox-download').addEventListener('click', downloadLightboxImage);
 
   document.getElementById('lightbox').addEventListener('click', (e) => {
     if (e.target.id === 'lightbox' || e.target.classList.contains('lightbox-overlay')) closeLightbox();
   });
 
   document.addEventListener('keydown', (e) => {
-    if (!document.getElementById('lightbox').classList.contains('active')) return;
+    if (!document.getElementById('lightbox').classList.contains('open')) return;
     if (e.key === 'Escape') closeLightbox();
     if (e.key === 'ArrowLeft') navigateLightbox(-1);
     if (e.key === 'ArrowRight') navigateLightbox(1);
@@ -758,27 +885,29 @@ function setupLightbox() {
 }
 
 function openLightbox(batchName, imageIndex) {
-  // Build images array from batch data
   const batch = galleryBatches.find(b => b.name === batchName);
   if (!batch || !batch.progress) return;
 
+  lightboxBatchName = batchName;
   const completedJobs = (batch.progress.jobs || []).filter(j => j.state === 'completed' && j.imagePath);
   lightboxImages = completedJobs.map(job => ({
     url: buildImageUrl(job.imagePath),
     prompt: job.originalPrompt || '',
     index: job.promptIndex,
+    imageId: job.imageId || `IMG-${String(job.promptIndex).padStart(3, '0')}`,
+    filename: job.imageFilename || '',
   }));
 
   if (lightboxImages.length === 0) return;
 
   lightboxIndex = Math.min(imageIndex, lightboxImages.length - 1);
   updateLightboxImage();
-  document.getElementById('lightbox').classList.add('active');
+  document.getElementById('lightbox').classList.add('open');
   document.body.style.overflow = 'hidden';
 }
 
 function closeLightbox() {
-  document.getElementById('lightbox').classList.remove('active');
+  document.getElementById('lightbox').classList.remove('open');
   document.body.style.overflow = '';
 }
 
@@ -793,7 +922,150 @@ function updateLightboxImage() {
   const img = lightboxImages[lightboxIndex];
   if (!img) return;
   document.getElementById('lightbox-img').src = img.url;
-  document.getElementById('lightbox-info').textContent = `#${String(img.index).padStart(2, '0')} — ${img.prompt}`;
+  // Show proper imageId (MB-CHAR-01 for moodboard, IMG-001 for script)
+  document.getElementById('lightbox-info').textContent = `${img.imageId}`;
+}
+
+function downloadLightboxImage() {
+  const img = lightboxImages[lightboxIndex];
+  if (!img || !img.filename) return;
+  downloadBatchImage(lightboxBatchName, img.filename);
+}
+
+// ═══════════════════════════════════════════
+// Moodboard Page
+// ═══════════════════════════════════════════
+function setupMoodboard() {
+  // Scan reference images
+  document.getElementById('btn-mb-scan-refs').addEventListener('click', async () => {
+    try {
+      const res = await fetch('/api/references');
+      const data = await res.json();
+      mbReferenceImages = data.images || [];
+      renderMBReferenceThumbs();
+      showToast(`Found ${mbReferenceImages.length} reference image(s)`, 'info');
+      updateMBChecklist();
+    } catch (err) {
+      showToast(`Scan failed: ${err.message}`, 'error');
+    }
+  });
+
+  // Fetch from MOODBOARD_PROMPTS folder
+  document.getElementById('btn-fetch-moodboard-prompts').addEventListener('click', async () => {
+    try {
+      const res = await fetch('/api/moodboard-prompts/read');
+      const data = await res.json();
+      if (data.content) {
+        document.getElementById('mb-prompts-input').value = data.content;
+        mbParsedPrompts = data.prompts || [];
+        const pill = document.getElementById('mb-prompt-count-pill');
+        pill.style.display = '';
+        pill.textContent = `${mbParsedPrompts.length} parsed`;
+        updateMBChecklist();
+        showToast(`Loaded ${mbParsedPrompts.length} prompts from MOODBOARD_PROMPTS/`, 'success');
+      } else {
+        showToast('No prompts found in MOODBOARD_PROMPTS/ folder', 'warning');
+      }
+    } catch (err) {
+      showToast(`Fetch failed: ${err.message}`, 'error');
+    }
+  });
+
+  // Upload ZIP file (moodboard page — looks for moodboard.md)
+  document.getElementById('btn-mb-load-zip').addEventListener('click', () => {
+    document.getElementById('mb-file-input').click();
+  });
+  document.getElementById('mb-file-input').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    await uploadZipFile(file, 'moodboard', 'mb-prompts-input', 'mb-prompt-count-pill');
+    e.target.value = '';
+  });
+
+  // Parse prompts
+  document.getElementById('btn-mb-parse').addEventListener('click', async () => {
+    const text = document.getElementById('mb-prompts-input').value;
+    if (!text.trim()) { showToast('Please enter or load prompts first', 'warning'); return; }
+
+    try {
+      const res = await fetch('/api/parse-prompts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      const data = await res.json();
+      mbParsedPrompts = data.prompts || [];
+      if (!data.valid) showToast(`Validation issues: ${data.errors.join(', ')}`, 'warning');
+
+      const pill = document.getElementById('mb-prompt-count-pill');
+      pill.style.display = '';
+      pill.textContent = `${mbParsedPrompts.length} parsed`;
+
+      updateMBChecklist();
+      showToast(`Parsed ${mbParsedPrompts.length} moodboard prompt(s)`, 'success');
+    } catch (err) {
+      showToast(`Parse failed: ${err.message}`, 'error');
+    }
+  });
+
+  // Start moodboard batch — always batchType='moodboard'
+  document.getElementById('btn-mb-start-batch').addEventListener('click', async () => {
+    const batchName = document.getElementById('mb-batch-name').value || 'moodboard-batch';
+    const promptsText = document.getElementById('mb-prompts-input').value;
+    const browserType = document.getElementById('browser-type').value;
+
+    if (!promptsText.trim()) { showToast('Please enter prompts first', 'warning'); return; }
+
+    try {
+      const setupRes = await fetch('/api/batch/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          batchName,
+          batchType: 'moodboard',
+          promptsText,
+          referenceImagePaths: mbReferenceImages.map(i => i.absolutePath),
+          browserType,
+        }),
+      });
+      const setupData = await setupRes.json();
+      if (setupData.error) throw new Error(setupData.error);
+
+      currentBatchName = batchName;
+      updateContextBar();
+      showToast('Moodboard batch created — starting generation…', 'success');
+
+      await fetch('/api/batch/start', { method: 'POST' });
+
+      batchRunning = true;
+      updateQueueControls();
+      showPage('review');
+      showReviewWaiting();
+      refreshProgress();
+    } catch (err) {
+      showToast(`Start failed: ${err.message}`, 'error');
+    }
+  });
+}
+
+function renderMBReferenceThumbs() {
+  const grid = document.getElementById('mb-reference-gallery');
+  grid.innerHTML = mbReferenceImages.map(img =>
+    `<div class="thumb"><img src="/reference-images/${encodeURIComponent(img.filename)}" alt="${esc(img.filename)}" loading="lazy"></div>`
+  ).join('');
+  document.getElementById('mb-ref-count').textContent = `${mbReferenceImages.length} references detected`;
+}
+
+function updateMBChecklist() {
+  const refs = mbReferenceImages.length > 0;
+  const browser = document.getElementById('browser-status-row').style.display !== 'none';
+  const prompts = mbParsedPrompts.length > 0;
+
+  setCheckDone('mb-check-refs', refs, `${mbReferenceImages.length} reference images loaded`);
+  setCheckDone('mb-check-browser', browser, 'Browser session connected');
+  setCheckDone('mb-check-prompts', prompts, `${mbParsedPrompts.length} prompts parsed and validated`);
+
+  document.getElementById('btn-mb-start-batch').disabled = !(refs && prompts);
 }
 
 // ═══════════════════════════════════════════
@@ -802,7 +1074,7 @@ function updateLightboxImage() {
 function showToast(message, type = 'info') {
   const container = document.getElementById('toast-container');
   const toast = document.createElement('div');
-  toast.className = `toast toast-${type}`;
+  toast.className = `toast ${type}`;
   toast.textContent = message;
   container.appendChild(toast);
 

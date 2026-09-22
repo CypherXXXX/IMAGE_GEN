@@ -43,6 +43,7 @@ export function parsePromptDocument(text: string): ParsedPrompt[] {
 
 /**
  * Parse using "PROMPT N" headers.
+ * Also extracts moodboard imageId from the prompt body if present.
  */
 function parseByHeaders(text: string): ParsedPrompt[] {
   const sections = text.split(/^PROMPT\s+\d+\s*/gim);
@@ -54,10 +55,19 @@ function parseByHeaders(text: string): ParsedPrompt[] {
     if (!body) continue;
 
     const index = i + 1;
+
+    // Extract moodboard imageId from the body — look for (MB-XXX-NN)
+    let imageId: string | undefined;
+    const mbMatch = body.match(/\(MB-[A-Z]+-\d+\)/i);
+    if (mbMatch) {
+      imageId = mbMatch[0].replace(/[()]/g, '').toUpperCase();
+    }
+
     prompts.push({
       index,
       title: extractPromptTitle(body),
       originalText: body,
+      imageId,
     });
   }
 

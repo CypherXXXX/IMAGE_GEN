@@ -1,388 +1,659 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Image Batch Studio — ChatGPT Automation</title>
-  <meta name="description" content="Automated ChatGPT image generation with style consistency, batch processing, and human-in-the-loop approval.">
+  <meta name="description"
+    content="Automated ChatGPT image generation with style consistency, batch processing, and human-in-the-loop approval.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="/css/styles.css">
 </head>
+
 <body>
 
-<div class="app">
+  <div class="app">
 
-  <!-- ══ Sidebar ══ -->
-  <aside class="sidebar">
-    <div class="brand">
-      <div class="brand-mark">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 15l-5-5-9 9"/></svg>
-      </div>
-      <div class="brand-text">
-        <div class="brand-title">Image Batch Studio</div>
-        <div class="brand-sub">v2, automation</div>
-      </div>
-    </div>
-
-    <nav class="nav">
-      <button class="nav-item active" data-page="setup" id="nav-setup">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><circle cx="9" cy="6" r="2"/><line x1="4" y1="12" x2="20" y2="12"/><circle cx="15" cy="12" r="2"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="7" cy="18" r="2"/></svg>
-        <span>Setup</span>
-      </button>
-      <button class="nav-item" data-page="review" id="nav-review">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5-9 9"/></svg>
-        <span>Review</span>
-        <span class="badge" id="review-badge" style="display:none;">1</span>
-      </button>
-      <button class="nav-item" data-page="queue" id="nav-queue">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h13"/></svg>
-        <span>Queue</span>
-        <span class="badge" id="queue-badge" style="display:none;"></span>
-      </button>
-      <button class="nav-item" data-page="gallery" id="nav-gallery">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-        <span>Gallery</span>
-      </button>
-    </nav>
-
-    <div class="sidebar-foot">
-      <div class="session-card">
-        <div class="session-row">
-          <span class="dot off" id="ws-dot"></span>
-          <span class="session-label">Browser session</span>
+    <!-- ══ Sidebar ══ -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="14" rx="2" />
+            <circle cx="8.5" cy="9.5" r="1.5" />
+            <path d="M21 15l-5-5-9 9" />
+          </svg>
         </div>
-        <span class="session-value" id="ws-status">Disconnected</span>
-      </div>
-    </div>
-  </aside>
-
-  <!-- ══ Main ══ -->
-  <div class="main">
-
-    <!-- Context Bar -->
-    <div class="context-bar">
-      <div class="context-left">
-        <div class="context-batchname" id="ctx-batchname">No batch loaded</div>
-        <div class="context-sub" id="ctx-sub">Configure a batch to begin</div>
-      </div>
-      <div class="stepper" id="stepper">
-        <div class="step current" data-step="setup"><div class="step-dot">1</div><div class="step-label">Setup</div></div>
-        <div class="step-line"></div>
-        <div class="step" data-step="review"><div class="step-dot">2</div><div class="step-label">Review &amp; lock style</div></div>
-        <div class="step-line"></div>
-        <div class="step" data-step="queue"><div class="step-dot">3</div><div class="step-label">Generate</div></div>
-        <div class="step-line"></div>
-        <div class="step" data-step="gallery"><div class="step-dot">4</div><div class="step-label">Complete</div></div>
-      </div>
-    </div>
-
-    <!-- Content Pages -->
-    <div class="content">
-
-      <!-- ═══ SETUP PAGE ═══ -->
-      <section class="page active" id="page-setup">
-        <div class="page-head">
-          <h1 class="page-title">Set up your batch</h1>
-          <p class="page-desc">Load references and prompts, connect a browser session, then start.</p>
+        <div class="brand-text">
+          <div class="brand-title">Image Batch Studio</div>
+          <div class="brand-sub">v2, automation</div>
         </div>
+      </div>
 
-        <div class="grid-2">
-          <!-- Left Column -->
-          <div>
-            <div class="panel">
-              <div class="panel-head">
-                <div class="panel-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="M21 16l-5-5-9 9"/></svg></div>
-                <div class="panel-title">Reference images</div>
-              </div>
-              <div class="dropzone">
-                Place files in <code>reference-images/</code>, then scan the folder.
-              </div>
-              <div class="btn-row">
-                <button class="btn btn-secondary" id="btn-scan-refs">
-                  <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>Scan folder
-                </button>
-              </div>
-              <div class="thumb-grid" id="reference-gallery"></div>
-              <p class="panel-hint" style="margin-top:12px; margin-bottom:0;" id="ref-count"></p>
-            </div>
+      <nav class="nav">
+        <button class="nav-item active" data-page="setup" id="nav-setup">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="4" y1="6" x2="20" y2="6" />
+            <circle cx="9" cy="6" r="2" />
+            <line x1="4" y1="12" x2="20" y2="12" />
+            <circle cx="15" cy="12" r="2" />
+            <line x1="4" y1="18" x2="20" y2="18" />
+            <circle cx="7" cy="18" r="2" />
+          </svg>
+          <span>Setup</span>
+        </button>
+        <button class="nav-item" data-page="review" id="nav-review">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <circle cx="9" cy="9" r="2" />
+            <path d="M21 15l-5-5-9 9" />
+          </svg>
+          <span>Review</span>
+          <span class="badge" id="review-badge" style="display:none;">1</span>
+        </button>
+        <button class="nav-item" data-page="queue" id="nav-queue">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 6h16M4 12h10M4 18h13" />
+          </svg>
+          <span>Queue</span>
+          <span class="badge" id="queue-badge" style="display:none;"></span>
+        </button>
+        <button class="nav-item" data-page="gallery" id="nav-gallery">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7" />
+            <rect x="14" y="3" width="7" height="7" />
+            <rect x="3" y="14" width="7" height="7" />
+            <rect x="14" y="14" width="7" height="7" />
+          </svg>
+          <span>Gallery</span>
+        </button>
+        <div class="nav-divider"></div>
+        <button class="nav-item" data-page="moodboard" id="nav-moodboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="9" height="9" rx="1" />
+            <rect x="13" y="2" width="9" height="9" rx="1" />
+            <rect x="2" y="13" width="9" height="9" rx="1" />
+            <circle cx="17.5" cy="17.5" r="4.5" />
+          </svg>
+          <span>Moodboard</span>
+        </button>
+      </nav>
 
-            <div class="panel">
-              <div class="panel-head">
-                <div class="panel-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.5 3.8 5.7 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.7-3.8-9s1.3-6.5 3.8-9z"/></svg></div>
-                <div class="panel-title">Browser session</div>
-              </div>
-              <div class="field">
-                <label class="label">Session type</label>
-                <select id="browser-type">
-                  <option value="chrome-cdp">Launch Chrome with CDP (recommended)</option>
-                  <option value="cdp">Attach to running Chrome</option>
-                  <option value="persistent">Playwright Chromium Profile</option>
-                </select>
-              </div>
-              <div class="session-row" id="browser-status-row" style="margin:4px 0 14px 0; display:none;">
-                <span class="dot on"></span>
-                <span class="session-value" style="color:var(--text-secondary)" id="browser-status-text">Connected</span>
-              </div>
-              <button class="btn btn-secondary" id="btn-launch-browser">
-                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Launch browser
-              </button>
-            </div>
+      <div class="sidebar-foot">
+        <div class="session-card">
+          <div class="session-row">
+            <span class="dot off" id="ws-dot"></span>
+            <span class="session-label">Browser session</span>
           </div>
+          <span class="session-value" id="ws-status">Disconnected</span>
+        </div>
+      </div>
+    </aside>
 
-          <!-- Right Column -->
-          <div>
-            <div class="panel">
-              <div class="panel-head">
-                <div class="panel-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg></div>
-                <div class="panel-title">Prompts</div>
-                <span class="pill accent" style="margin-left:auto; display:none;" id="prompt-count-pill"></span>
-              </div>
-              <p class="panel-hint">Paste prompts below, or load a text file. Separate entries with <code>---</code>.</p>
-              <textarea id="prompts-input" placeholder="PROMPT 001&#10;A person sitting alone at a desk, warm window light, editorial photography style.&#10;&#10;---&#10;&#10;PROMPT 002&#10;A person checking their phone on a train platform, blue hour, shallow depth of field."></textarea>
-              <div class="btn-row" style="margin-top:14px;">
-                <button class="btn btn-secondary" id="btn-load-file">
-                  <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M21 8v11a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h8"/><path d="M17 3l4 4-9.5 9.5L7 18l1.5-4.5L17 3z"/></svg>Load file
-                </button>
-                <input type="file" id="file-input" accept=".txt,.md,.text" style="display:none">
-                <button class="btn btn-primary" id="btn-parse">
-                  <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M5 12h14M13 6l6 6-6 6"/></svg>Parse prompts
-                </button>
-              </div>
-            </div>
+    <!-- ══ Main ══ -->
+    <div class="main">
 
-            <div class="panel">
-              <div class="panel-head">
-                <div class="panel-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 01-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 010-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 014 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.5 1h.1a2 2 0 010 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg></div>
-                <div class="panel-title">Batch settings</div>
-              </div>
-              <div class="field">
-                <label class="label">Batch name</label>
-                <input class="input" id="batch-name" value="" placeholder="my-image-batch">
-              </div>
-
-              <div class="checklist" id="setup-checklist">
-                <div class="check-row" id="check-refs"><span class="check-mark"></span>Reference images loaded</div>
-                <div class="check-row" id="check-browser"><span class="check-mark"></span>Browser session connected</div>
-                <div class="check-row" id="check-prompts"><span class="check-mark"></span>Prompts parsed and validated</div>
-              </div>
-
-              <button class="btn btn-primary btn-block" id="btn-start-batch" disabled>
-                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M5 3l14 9-14 9V3z"/></svg>Start batch
-              </button>
-            </div>
+      <!-- Context Bar -->
+      <div class="context-bar">
+        <div class="context-left">
+          <div class="context-batchname" id="ctx-batchname">No batch loaded</div>
+          <div class="context-sub" id="ctx-sub">Configure a batch to begin</div>
+        </div>
+        <div class="stepper" id="stepper">
+          <div class="step current" data-step="setup">
+            <div class="step-dot">1</div>
+            <div class="step-label">Setup</div>
+          </div>
+          <div class="step-line"></div>
+          <div class="step" data-step="review">
+            <div class="step-dot">2</div>
+            <div class="step-label">Review &amp; lock style</div>
+          </div>
+          <div class="step-line"></div>
+          <div class="step" data-step="queue">
+            <div class="step-dot">3</div>
+            <div class="step-label">Generate</div>
+          </div>
+          <div class="step-line"></div>
+          <div class="step" data-step="gallery">
+            <div class="step-dot">4</div>
+            <div class="step-label">Complete</div>
           </div>
         </div>
-      </section>
+      </div>
 
-      <!-- ═══ REVIEW PAGE ═══ -->
-      <section class="page" id="page-review">
-        <div class="page-head">
-          <h1 class="page-title">Review the first image</h1>
-          <p class="page-desc">Approve to lock the style for the rest of this batch, or request changes.</p>
-        </div>
+      <!-- Content Pages -->
+      <div class="content">
 
-        <!-- Review States -->
-        <div id="review-state-waiting" class="review-layout">
-          <div>
-            <div class="hero-frame">
-              <div class="hero-image">
-                <div class="ph">
-                  <div class="spinner"></div>
-                  <span id="review-waiting-text">Waiting for first image generation…</span>
+        <!-- ═══ SETUP PAGE ═══ -->
+        <section class="page active" id="page-setup">
+          <div class="page-head">
+            <h1 class="page-title">Set up your batch</h1>
+            <p class="page-desc">Load references and prompts, connect a browser session, then start.</p>
+          </div>
+
+          <div class="grid-2">
+            <!-- Left Column -->
+            <div>
+              <div class="panel">
+                <div class="panel-head">
+                  <div class="panel-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+                      <rect x="3" y="5" width="18" height="14" rx="2" />
+                      <circle cx="8.5" cy="10.5" r="1.5" />
+                      <path d="M21 16l-5-5-9 9" />
+                    </svg></div>
+                  <div class="panel-title">Reference images</div>
+                </div>
+                <div class="dropzone">
+                  Place files in <code>reference-images/</code>, then scan the folder.
+                </div>
+                <div class="btn-row">
+                  <button class="btn btn-secondary" id="btn-scan-refs">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+                      <circle cx="11" cy="11" r="7" />
+                      <path d="M21 21l-4.3-4.3" />
+                    </svg>Scan folder
+                  </button>
+                </div>
+                <div class="thumb-grid" id="reference-gallery"></div>
+                <p class="panel-hint" style="margin-top:12px; margin-bottom:0;" id="ref-count"></p>
+              </div>
+
+              <div class="panel">
+                <div class="panel-head">
+                  <div class="panel-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+                      <circle cx="12" cy="12" r="9" />
+                      <path
+                        d="M3 12h18M12 3c2.5 2.5 3.8 5.7 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.7-3.8-9s1.3-6.5 3.8-9z" />
+                    </svg></div>
+                  <div class="panel-title">Browser session</div>
+                </div>
+                <div class="field">
+                  <label class="label">Session type</label>
+                  <select id="browser-type">
+                    <option value="chrome-cdp">Launch Chrome with CDP (recommended)</option>
+                    <option value="cdp">Attach to running Chrome</option>
+                    <option value="persistent">Playwright Chromium Profile</option>
+                  </select>
+                </div>
+                <div class="session-row" id="browser-status-row" style="margin:4px 0 14px 0; display:none;">
+                  <span class="dot on"></span>
+                  <span class="session-value" style="color:var(--text-secondary)"
+                    id="browser-status-text">Connected</span>
+                </div>
+                <button class="btn btn-secondary" id="btn-launch-browser">
+                  <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+                    <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                  </svg>Launch browser
+                </button>
+              </div>
+            </div>
+
+            <!-- Right Column -->
+            <div>
+              <div class="panel">
+                <div class="panel-head">
+                  <div class="panel-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+                      <path d="M12 19l7-7 3 3-7 7-3-3z" />
+                      <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
+                      <path d="M2 2l7.586 7.586" />
+                      <circle cx="11" cy="11" r="2" />
+                    </svg></div>
+                  <div class="panel-title">Prompts</div>
+                  <span class="pill accent" style="margin-left:auto; display:none;" id="prompt-count-pill"></span>
+                </div>
+                <p class="panel-hint">Choose a prompt source:</p>
+                <div class="btn-row" style="margin-bottom:12px;">
+                  <button class="btn btn-secondary btn-sm" id="btn-fetch-image-prompts">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+                      <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                    </svg>Fetch from IMAGE_PROMPTS
+                  </button>
+                  <button class="btn btn-secondary btn-sm" id="btn-load-zip">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+                      <path d="M21 8v11a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h8" />
+                      <path d="M17 3l4 4-9.5 9.5L7 18l1.5-4.5L17 3z" />
+                    </svg>Upload .zip file
+                  </button>
+                </div>
+                <textarea id="prompts-input"
+                  placeholder="PROMPT 001&#10;A person sitting alone at a desk, warm window light, editorial photography style.&#10;&#10;---&#10;&#10;PROMPT 002&#10;A person checking their phone on a train platform, blue hour, shallow depth of field."></textarea>
+                <input type="file" id="file-input" accept=".zip" style="display:none">
+                <div class="btn-row" style="margin-top:14px;">
+                  <button class="btn btn-primary" id="btn-parse">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+                      <path d="M5 12h14M13 6l6 6-6 6" />
+                    </svg>Parse prompts
+                  </button>
                 </div>
               </div>
-              <div class="hero-meta">
-                <span class="pill pulsing"><span class="dotm"></span>Generating</span>
-                <span class="retry-count" id="review-attempt">Attempt 1</span>
+
+              <div class="panel">
+                <div class="panel-head">
+                  <div class="panel-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+                      <rect x="3" y="3" width="7" height="7" />
+                      <rect x="14" y="3" width="7" height="7" />
+                      <rect x="3" y="14" width="7" height="7" />
+                      <rect x="14" y="14" width="7" height="7" />
+                    </svg></div>
+                  <div class="panel-title">Moodboard images (for REFS)</div>
+                </div>
+                <p class="panel-hint">These images from <code>MOODBOARD_IMAGES/</code> are available for REFS attachment
+                  in prompts.</p>
+                <div class="btn-row">
+                  <button class="btn btn-secondary btn-sm" id="btn-scan-moodboard-images">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+                      <circle cx="11" cy="11" r="7" />
+                      <path d="M21 21l-4.3-4.3" />
+                    </svg>Scan MOODBOARD_IMAGES/
+                  </button>
+                </div>
+                <div class="thumb-grid" id="setup-moodboard-gallery"></div>
+                <p class="panel-hint" style="margin-top:12px; margin-bottom:0;" id="setup-moodboard-count"></p>
+              </div>
+
+              <div class="panel">
+                <div class="panel-head">
+                  <div class="panel-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+                      <circle cx="12" cy="12" r="3" />
+                      <path
+                        d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 01-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 010-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 014 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.5 1h.1a2 2 0 010 4h-.1a1.7 1.7 0 00-1.5 1z" />
+                    </svg></div>
+                  <div class="panel-title">Batch settings</div>
+                </div>
+                <div class="field">
+                  <label class="label">Batch name</label>
+                  <input class="input" id="batch-name" value="" placeholder="my-image-batch">
+                </div>
+
+                <div class="checklist" id="setup-checklist">
+                  <div class="check-row" id="check-refs"><span class="check-mark"></span>Reference images loaded</div>
+                  <div class="check-row" id="check-browser"><span class="check-mark"></span>Browser session connected
+                  </div>
+                  <div class="check-row" id="check-prompts"><span class="check-mark"></span>Prompts parsed and validated
+                  </div>
+                </div>
+
+                <button class="btn btn-primary btn-block" id="btn-start-batch" disabled>
+                  <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+                    <path d="M5 3l14 9-14 9V3z" />
+                  </svg>Start batch
+                </button>
               </div>
             </div>
+          </div>
+        </section>
 
-            <div class="label" style="margin-top:16px;">Reference gallery</div>
-            <div class="ref-strip" id="review-references"></div>
+        <!-- ═══ REVIEW PAGE ═══ -->
+        <section class="page" id="page-review">
+          <div class="page-head">
+            <h1 class="page-title">Review the first image</h1>
+            <p class="page-desc">Approve to lock the style for the rest of this batch, or request changes.</p>
           </div>
 
-          <div>
-            <div class="panel">
-              <div class="prompt-block">
-                <label class="label">Current prompt</label>
-                <div class="prompt-text muted" id="review-current-prompt">Waiting for generation to start…</div>
-              </div>
-              <p class="approval-note">The first generated image will appear here for your review. Approve it to lock the visual style for all remaining prompts.</p>
-            </div>
-          </div>
-        </div>
-
-        <div id="review-state-ready" style="display:none;">
-          <div class="review-layout">
+          <!-- Review States -->
+          <div id="review-state-waiting" class="review-layout">
             <div>
               <div class="hero-frame">
-                <div class="hero-image" id="review-image-container">
-                  <img id="review-image" src="" alt="Generated image">
+                <div class="hero-image">
+                  <div class="ph">
+                    <div class="spinner"></div>
+                    <span id="review-waiting-text">Waiting for first image generation…</span>
+                  </div>
                 </div>
                 <div class="hero-meta">
-                  <span class="pill accent"><span class="dotm"></span>Awaiting your review</span>
-                  <span class="retry-count" id="review-attempt-ready">Attempt 1</span>
+                  <span class="pill pulsing"><span class="dotm"></span>Generating</span>
+                  <span class="retry-count" id="review-attempt">Attempt 1</span>
                 </div>
               </div>
 
               <div class="label" style="margin-top:16px;">Reference gallery</div>
-              <div class="ref-strip" id="review-references-ready"></div>
+              <div class="ref-strip" id="review-references"></div>
             </div>
 
             <div>
               <div class="panel">
                 <div class="prompt-block">
-                  <label class="label">Original prompt</label>
-                  <div class="prompt-text muted" id="review-original-prompt"></div>
+                  <label class="label">Current prompt</label>
+                  <div class="prompt-text muted" id="review-current-prompt">Waiting for generation to start…</div>
                 </div>
-                <div class="prompt-block">
-                  <label class="label">Revision instructions</label>
-                  <textarea id="revision-text" style="min-height:70px;" placeholder="e.g. warmer light, wider shot, less contrast…"></textarea>
-                </div>
-
-                <div class="btn-row" style="margin-top:16px;">
-                  <button class="btn btn-success btn-block" id="btn-approve">
-                    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M5 12l5 5L20 7"/></svg>Approve &amp; lock style
-                  </button>
-                </div>
-                <div class="btn-row" style="margin-top:10px;">
-                  <button class="btn btn-secondary" style="flex:1;" id="btn-regenerate">
-                    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M3 12a9 9 0 019-9c2.5 0 4.7 1 6.3 2.6M21 12a9 9 0 01-9 9c-2.5 0-4.7-1-6.3-2.6"/><path d="M21 3v6h-6M3 21v-6h6"/></svg>Regenerate
-                  </button>
-                  <button class="btn btn-danger" style="flex:1;" id="btn-reject">
-                    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M18 6L6 18M6 6l12 12"/></svg>Reject
-                  </button>
-                </div>
-                <p class="approval-note">Approving sets this image as the style reference for the batch, so later prompts inherit its look automatically.</p>
+                <p class="approval-note">The first generated image will appear here for your review. Approve it to lock
+                  the visual style for all remaining prompts.</p>
               </div>
             </div>
           </div>
-        </div>
 
-        <div id="review-state-locked" style="display:none;">
-          <div class="lock-banner">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
-            Style locked from the approved image. Remaining prompts will match it automatically.
-          </div>
-          <div class="review-layout" style="margin-top:16px;">
-            <div>
-              <div class="hero-frame">
-                <div class="hero-image" id="locked-image-container">
-                  <img id="locked-image" src="" alt="Approved image">
+          <div id="review-state-ready" style="display:none;">
+            <div class="review-layout">
+              <div>
+                <div class="hero-frame">
+                  <div class="hero-image" id="review-image-container">
+                    <img id="review-image" src="" alt="Generated image">
+                  </div>
+                  <div class="hero-meta">
+                    <span class="pill accent"><span class="dotm"></span>Awaiting your review</span>
+                    <span class="retry-count" id="review-attempt-ready">Attempt 1</span>
+                  </div>
                 </div>
-                <div class="hero-meta">
-                  <span class="pill success"><span class="dotm"></span>Approved</span>
+
+                <div class="label" style="margin-top:16px;">Reference gallery</div>
+                <div class="ref-strip" id="review-references-ready"></div>
+              </div>
+
+              <div>
+                <div class="panel">
+                  <div class="prompt-block">
+                    <label class="label">Original prompt</label>
+                    <div class="prompt-text muted" id="review-original-prompt"></div>
+                  </div>
+                  <div class="prompt-block">
+                    <label class="label">Revision instructions</label>
+                    <textarea id="revision-text" style="min-height:70px;"
+                      placeholder="e.g. warmer light, wider shot, less contrast…"></textarea>
+                  </div>
+
+                  <div class="btn-row" style="margin-top:16px;">
+                    <button class="btn btn-success btn-block" id="btn-approve">
+                      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+                        <path d="M5 12l5 5L20 7" />
+                      </svg>Approve &amp; lock style
+                    </button>
+                  </div>
+                  <div class="btn-row" style="margin-top:10px;">
+                    <button class="btn btn-secondary" style="flex:1;" id="btn-regenerate">
+                      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+                        <path d="M3 12a9 9 0 019-9c2.5 0 4.7 1 6.3 2.6M21 12a9 9 0 01-9 9c-2.5 0-4.7-1-6.3-2.6" />
+                        <path d="M21 3v6h-6M3 21v-6h6" />
+                      </svg>Regenerate
+                    </button>
+                    <button class="btn btn-danger" style="flex:1;" id="btn-reject">
+                      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+                        <path d="M18 6L6 18M6 6l12 12" />
+                      </svg>Reject
+                    </button>
+                  </div>
+                  <p class="approval-note">Approving sets this image as the style reference for the batch, so later
+                    prompts inherit its look automatically.</p>
                 </div>
               </div>
             </div>
+          </div>
+
+          <div id="review-state-locked" style="display:none;">
+            <div class="lock-banner">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+                <rect x="5" y="11" width="14" height="9" rx="2" />
+                <path d="M8 11V7a4 4 0 018 0v4" />
+              </svg>
+              Style locked from the approved image. Remaining prompts will match it automatically.
+            </div>
+            <div class="review-layout" style="margin-top:16px;">
+              <div>
+                <div class="hero-frame">
+                  <div class="hero-image" id="locked-image-container">
+                    <img id="locked-image" src="" alt="Approved image">
+                  </div>
+                  <div class="hero-meta">
+                    <span class="pill success"><span class="dotm"></span>Approved</span>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <div class="panel">
+                  <div class="prompt-block">
+                    <label class="label">Approved prompt</label>
+                    <div class="prompt-text" id="locked-prompt"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══ QUEUE PAGE ═══ -->
+        <section class="page" id="page-queue">
+          <div class="page-head">
+            <h1 class="page-title">Generation queue</h1>
+            <p class="page-desc">Style is locked. Remaining prompts are generating sequentially.</p>
+          </div>
+
+          <div class="queue-top">
+            <div class="progress-track">
+              <div class="progress-top-row">
+                <span id="q-progress-text">0 / 0 completed</span>
+                <span id="q-failed-text" style="color:var(--danger);"></span>
+                <span class="pill" id="q-status-pill">Idle</span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-bar-fill" id="q-progress-fill" style="width:0%;"></div>
+              </div>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-secondary btn-sm" id="btn-pause" disabled>
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+                  <rect x="6" y="4" width="4" height="16" />
+                  <rect x="14" y="4" width="4" height="16" />
+                </svg>Pause
+              </button>
+              <button class="btn btn-secondary btn-sm" id="btn-resume" disabled>
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+                  <path d="M5 3l14 9-14 9V3z" />
+                </svg>Resume
+              </button>
+              <button class="btn btn-danger btn-sm" id="btn-cancel" disabled>
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+                  <rect x="6" y="6" width="12" height="12" rx="1" />
+                </svg>Cancel
+              </button>
+            </div>
+          </div>
+
+          <div class="queue-layout">
             <div>
               <div class="panel">
+                <div class="panel-head">
+                  <div class="panel-title">Current job</div>
+                </div>
+                <div class="current-job-image" id="q-current-image">
+                  <div class="ph">
+                    <div class="spinner"></div>
+                  </div>
+                </div>
                 <div class="prompt-block">
-                  <label class="label">Approved prompt</label>
-                  <div class="prompt-text" id="locked-prompt"></div>
+                  <label class="label" id="q-current-label">Waiting…</label>
+                  <div class="prompt-text muted" id="q-current-prompt">No active generation</div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
 
-      <!-- ═══ QUEUE PAGE ═══ -->
-      <section class="page" id="page-queue">
-        <div class="page-head">
-          <h1 class="page-title">Generation queue</h1>
-          <p class="page-desc">Style is locked. Remaining prompts are generating sequentially.</p>
-        </div>
-
-        <div class="queue-top">
-          <div class="progress-track">
-            <div class="progress-top-row">
-              <span id="q-progress-text">0 / 0 completed</span>
-              <span id="q-failed-text" style="color:var(--danger);"></span>
-              <span class="pill" id="q-status-pill">Idle</span>
-            </div>
-            <div class="progress-bar"><div class="progress-bar-fill" id="q-progress-fill" style="width:0%;"></div></div>
-          </div>
-          <div class="btn-row">
-            <button class="btn btn-secondary btn-sm" id="btn-pause" disabled>
-              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>Pause
-            </button>
-            <button class="btn btn-secondary btn-sm" id="btn-resume" disabled>
-              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M5 3l14 9-14 9V3z"/></svg>Resume
-            </button>
-            <button class="btn btn-danger btn-sm" id="btn-cancel" disabled>
-              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>Cancel
-            </button>
-          </div>
-        </div>
-
-        <div class="queue-layout">
-          <div>
-            <div class="panel">
-              <div class="panel-head"><div class="panel-title">Current job</div></div>
-              <div class="current-job-image" id="q-current-image">
-                <div class="ph"><div class="spinner"></div></div>
-              </div>
-              <div class="prompt-block">
-                <label class="label" id="q-current-label">Waiting…</label>
-                <div class="prompt-text muted" id="q-current-prompt">No active generation</div>
+            <div>
+              <div class="panel">
+                <div class="panel-head">
+                  <div class="panel-title">Job queue</div><span class="pill" style="margin-left:auto;"
+                    id="q-total-pill">0 total</span>
+                </div>
+                <div class="job-list" id="job-list"></div>
               </div>
             </div>
           </div>
+        </section>
 
-          <div>
-            <div class="panel">
-              <div class="panel-head"><div class="panel-title">Job queue</div><span class="pill" style="margin-left:auto;" id="q-total-pill">0 total</span></div>
-              <div class="job-list" id="job-list"></div>
+        <!-- ═══ GALLERY PAGE ═══ -->
+        <section class="page" id="page-gallery">
+          <div class="page-head">
+            <h1 class="page-title">Image gallery</h1>
+            <p class="page-desc">Browse all generated images organized by batch.</p>
+          </div>
+
+          <div class="gallery-toolbar">
+            <input class="input" placeholder="Search batches…" id="gallery-search">
+            <select class="input" id="gallery-sort" style="width:auto; min-width:140px;">
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" id="btn-refresh-gallery">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+                <path d="M3 12a9 9 0 019-9c2.5 0 4.7 1 6.3 2.6M21 12a9 9 0 01-9 9c-2.5 0-4.7-1-6.3-2.6" />
+                <path d="M21 3v6h-6M3 21v-6h6" />
+              </svg>Refresh
+            </button>
+            <span class="gallery-stats" id="gallery-stats"></span>
+          </div>
+
+          <div id="gallery-batches"></div>
+        </section>
+
+        <!-- ═══ MOODBOARD PAGE ═══ -->
+        <section class="page" id="page-moodboard">
+          <div class="page-head">
+            <h1 class="page-title">Moodboard generation</h1>
+            <p class="page-desc">Generate moodboard reference images — character sheets, environments, props, and more.
+            </p>
+          </div>
+
+          <div class="grid-2">
+            <!-- Left Column -->
+            <div>
+              <div class="panel">
+                <div class="panel-head">
+                  <div class="panel-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+                      <rect x="3" y="5" width="18" height="14" rx="2" />
+                      <circle cx="8.5" cy="10.5" r="1.5" />
+                      <path d="M21 16l-5-5-9 9" />
+                    </svg></div>
+                  <div class="panel-title">Reference images</div>
+                </div>
+                <div class="btn-row">
+                  <button class="btn btn-secondary" id="btn-mb-scan-refs">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+                      <circle cx="11" cy="11" r="7" />
+                      <path d="M21 21l-4.3-4.3" />
+                    </svg>Scan reference-images/
+                  </button>
+                </div>
+                <div class="thumb-grid" id="mb-reference-gallery"></div>
+                <p class="panel-hint" style="margin-top:12px; margin-bottom:0;" id="mb-ref-count"></p>
+              </div>
+
+            </div>
+
+            <!-- Right Column -->
+            <div>
+              <div class="panel">
+                <div class="panel-head">
+                  <div class="panel-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+                      <path d="M12 19l7-7 3 3-7 7-3-3z" />
+                      <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
+                      <path d="M2 2l7.586 7.586" />
+                      <circle cx="11" cy="11" r="2" />
+                    </svg></div>
+                  <div class="panel-title">Moodboard prompts</div>
+                  <span class="pill accent" style="margin-left:auto; display:none;" id="mb-prompt-count-pill"></span>
+                </div>
+                <p class="panel-hint">Choose a prompt source:</p>
+                <div class="btn-row" style="margin-bottom:12px;">
+                  <button class="btn btn-secondary btn-sm" id="btn-fetch-moodboard-prompts">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+                      <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                    </svg>Fetch from MOODBOARD_PROMPTS
+                  </button>
+                  <button class="btn btn-secondary btn-sm" id="btn-mb-load-zip">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+                      <path d="M21 8v11a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h8" />
+                      <path d="M17 3l4 4-9.5 9.5L7 18l1.5-4.5L17 3z" />
+                    </svg>Upload .zip file
+                  </button>
+                </div>
+                <textarea id="mb-prompts-input"
+                  placeholder="Paste moodboard prompts here, or use one of the buttons above to load from files…"></textarea>
+                <input type="file" id="mb-file-input" accept=".zip" style="display:none">
+                <div class="btn-row" style="margin-top:14px;">
+                  <button class="btn btn-primary" id="btn-mb-parse">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+                      <path d="M5 12h14M13 6l6 6-6 6" />
+                    </svg>Parse prompts
+                  </button>
+                </div>
+              </div>
+
+              <div class="panel">
+                <div class="panel-head">
+                  <div class="panel-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+                      <circle cx="12" cy="12" r="3" />
+                      <path
+                        d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 01-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 010-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 014 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.5 1h.1a2 2 0 010 4h-.1a1.7 1.7 0 00-1.5 1z" />
+                    </svg></div>
+                  <div class="panel-title">Moodboard batch settings</div>
+                </div>
+                <div class="field">
+                  <label class="label">Batch name</label>
+                  <input class="input" id="mb-batch-name" value="" placeholder="moodboard-batch">
+                </div>
+
+                <div class="checklist">
+                  <div class="check-row" id="mb-check-refs"><span class="check-mark"></span>Reference images loaded
+                  </div>
+                  <div class="check-row" id="mb-check-browser"><span class="check-mark"></span>Browser session connected
+                  </div>
+                  <div class="check-row" id="mb-check-prompts"><span class="check-mark"></span>Prompts parsed and
+                    validated</div>
+                </div>
+
+                <button class="btn btn-primary btn-block" id="btn-mb-start-batch" disabled>
+                  <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+                    <path d="M5 3l14 9-14 9V3z" />
+                  </svg>Start moodboard batch
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- ═══ GALLERY PAGE ═══ -->
-      <section class="page" id="page-gallery">
-        <div class="page-head">
-          <h1 class="page-title">Image gallery</h1>
-          <p class="page-desc">Browse all generated images organized by batch.</p>
-        </div>
-
-        <div class="gallery-toolbar">
-          <input class="input" placeholder="Search batches…" id="gallery-search">
-          <button class="btn btn-secondary btn-sm" id="btn-refresh-gallery">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M3 12a9 9 0 019-9c2.5 0 4.7 1 6.3 2.6M21 12a9 9 0 01-9 9c-2.5 0-4.7-1-6.3-2.6"/><path d="M21 3v6h-6M3 21v-6h6"/></svg>Refresh
-          </button>
-          <span class="gallery-stats" id="gallery-stats"></span>
-        </div>
-
-        <div id="gallery-batches"></div>
-      </section>
-
+      </div>
     </div>
   </div>
-</div>
 
-<!-- Lightbox Overlay -->
-<div class="lightbox-overlay" id="lightbox">
-  <div class="lightbox-content">
-    <button class="lightbox-close" id="lightbox-close">
-      <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-    </button>
-    <button class="lightbox-nav prev" id="lightbox-prev">
-      <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
-    </button>
-    <button class="lightbox-nav next" id="lightbox-next">
-      <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
-    </button>
-    <img id="lightbox-img" src="" alt="Full size image">
-    <div class="lightbox-info" id="lightbox-info"></div>
+  <!-- Lightbox Overlay -->
+  <div class="lightbox-overlay" id="lightbox">
+    <div class="lightbox-content">
+      <button class="lightbox-close" id="lightbox-close">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+          <path d="M18 6L6 18M6 6l12 12" />
+        </svg>
+      </button>
+      <button class="lightbox-nav prev" id="lightbox-prev">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+          <path d="M15 18l-6-6 6-6" />
+        </svg>
+      </button>
+      <button class="lightbox-nav next" id="lightbox-next">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+          <path d="M9 18l6-6-6-6" />
+        </svg>
+      </button>
+      <img id="lightbox-img" src="" alt="Full size image">
+      <div class="lightbox-info" id="lightbox-info"></div>
+      <div class="lightbox-actions" id="lightbox-actions">
+        <button class="btn btn-secondary btn-sm" id="lightbox-download">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>Download
+        </button>
+      </div>
+    </div>
   </div>
-</div>
 
-<!-- Toast notifications -->
-<div id="toast-container" class="toast-container"></div>
+  <!-- Toast notifications -->
+  <div id="toast-container" class="toast-container"></div>
 
-<script src="/js/app.js"></script>
+  <script src="/js/app.js"></script>
 </body>
+
 </html>

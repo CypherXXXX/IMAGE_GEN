@@ -6,9 +6,15 @@ export interface AppConfig {
   projectRoot: string;
   referenceImagesDir: string;
   batchesDir: string;
-  downloadedImagesDir: string;
   browserProfilesDir: string;
   defaultProfileDir: string;
+
+  // Moodboard & Script paths
+  moodboardPromptsDir: string;
+  moodboardImagesDir: string;
+  imagePromptsDir: string;
+  scriptImagesDir: string;
+  skillFilePath: string;
 
   // Browser
   browserType: 'chrome-cdp' | 'persistent' | 'cdp';
@@ -41,9 +47,15 @@ export const DEFAULT_CONFIG: AppConfig = {
   projectRoot: PROJECT_ROOT,
   referenceImagesDir: path.join(PROJECT_ROOT, 'reference-images'),
   batchesDir: path.join(PROJECT_ROOT, 'batches'),
-  downloadedImagesDir: path.join(PROJECT_ROOT, 'downloaded_images'),
   browserProfilesDir: path.join(PROJECT_ROOT, 'browser-profiles'),
   defaultProfileDir: path.join(PROJECT_ROOT, 'browser-profiles', 'chatgpt-main'),
+
+  // Moodboard & Script paths
+  moodboardPromptsDir: path.join(PROJECT_ROOT, 'MOODBOARD_PROMPTS'),
+  moodboardImagesDir: path.join(PROJECT_ROOT, 'MOODBOARD_IMAGES'),
+  imagePromptsDir: path.join(PROJECT_ROOT, 'IMAGE_PROMPTS'),
+  scriptImagesDir: path.join(PROJECT_ROOT, 'SCRIPT_IMAGES'),
+  skillFilePath: path.join(PROJECT_ROOT, '02-gpt-image-generator.md'),
 
   browserType: 'chrome-cdp',
   cdpEndpoint: 'http://localhost:9222',
@@ -52,7 +64,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   slowMo: 50,
 
   chatgptUrl: 'https://chatgpt.com',
-  imagesPerChat: 10,
+  imagesPerChat: 30,
   generationTimeoutMs: 180_000, // 3 minutes
   pollIntervalMs: 2_000,
   delayBetweenPromptsMs: 5_000,
@@ -81,7 +93,7 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   const config = { ...DEFAULT_CONFIG, ...fileConfig, ...overrides };
 
   // Ensure directories exist
-  for (const dir of [config.referenceImagesDir, config.batchesDir, config.downloadedImagesDir, config.browserProfilesDir, config.defaultProfileDir]) {
+  for (const dir of [config.referenceImagesDir, config.batchesDir, config.browserProfilesDir, config.defaultProfileDir, config.moodboardPromptsDir, config.moodboardImagesDir, config.imagePromptsDir, config.scriptImagesDir]) {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }

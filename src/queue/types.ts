@@ -21,7 +21,10 @@ export type BatchState =
   | 'paused'
   | 'completed'
   | 'failed'
-  | 'cancelled';
+  | 'cancelled'
+  | 'interrupted';
+
+export type BatchType = 'script' | 'moodboard';
 
 export interface ParsedPrompt {
   index: number;           // 1-based prompt number
@@ -30,6 +33,8 @@ export interface ParsedPrompt {
   preparedText?: string;   // Text with style instructions added
   revisionText?: string;   // Revision instructions (for prompt 1 rejections)
   finalText?: string;      // The final text actually sent to ChatGPT
+  imageId?: string;        // e.g. IMG-001, MB-CHAR-01
+  refs?: string[];         // Referenced moodboard image IDs (e.g. ['MB-PROP-01', 'MB-ENV-01'])
 }
 
 export interface ReferenceImage {
@@ -74,6 +79,7 @@ export interface JobMetadata {
   imagePath: string;
   imageFilename: string;
   imageUrl: string;
+  imageId: string;         // e.g. IMG-001, MB-CHAR-01 — for proper naming
   chatNumber: number;
   retryCount: number;
   error: string;
@@ -86,6 +92,7 @@ export interface BatchProgress {
   batchId: string;
   batchName: string;
   batchFolder: string;
+  batchType: BatchType;
   state: BatchState;
   totalPrompts: number;
   completedCount: number;
@@ -99,15 +106,18 @@ export interface BatchProgress {
   createdAt: string;
   updatedAt: string;
   completedAt: string;
+  outputDir: string;       // Where final images are saved (MOODBOARD_IMAGES or SCRIPT_IMAGES)
 }
 
 export interface BatchSetupOptions {
   batchName: string;
+  batchType: BatchType;
   promptsText: string;
   promptsFilePath?: string;
   referenceImagePaths: string[];
   browserType: 'persistent' | 'cdp' | 'existing-chrome';
-  outputFolder?: string;
+  outputDir?: string;        // Final output directory
+  moodboardImagePaths?: string[]; // Paths to moodboard images for script batches
 }
 
 export interface ReviewDecision {
@@ -122,6 +132,7 @@ export type OrchestratorEvent =
   | { type: 'job_generating'; promptIndex: number; progress?: number }
   | { type: 'job_completed'; promptIndex: number; imagePath: string }
   | { type: 'job_failed'; promptIndex: number; error: string }
+  | { type: 'job_retry_requested'; promptIndex: number }
   | { type: 'awaiting_review'; promptIndex: number; imagePath: string }
   | { type: 'style_approved'; styleBiblePath: string }
   | { type: 'style_rejected'; promptIndex: number }
@@ -133,3 +144,4 @@ export type OrchestratorEvent =
   | { type: 'captcha_detected'; message: string }
   | { type: 'error'; error: string; promptIndex?: number }
   | { type: 'progress_update'; progress: BatchProgress };
+

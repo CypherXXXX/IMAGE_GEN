@@ -27,8 +27,11 @@ export function createApp(config: AppConfig, orchestrator: BatchOrchestrator) {
   // Serve reference images for preview
   app.use('/reference-images', express.static(config.referenceImagesDir));
 
-  // Serve downloaded images for review/gallery preview
-  app.use('/downloaded-images', express.static(config.downloadedImagesDir));
+  // Serve moodboard images
+  app.use('/moodboard-images', express.static(config.moodboardImagesDir));
+
+  // Serve script images
+  app.use('/script-images', express.static(config.scriptImagesDir));
 
   // API routes
   setupApiRoutes(app, orchestrator);

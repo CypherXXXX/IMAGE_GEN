@@ -20,10 +20,10 @@ import { StyleAnchor } from '../style/anchor';
 import { startNewChat } from '../chatgpt/navigation';
 import { sendGenerationRequest } from '../chatgpt/composer';
 import { waitForGeneration, countAssistantMessages } from '../chatgpt/generation';
-import { createImageInterceptor, downloadGeneratedImage } from '../chatgpt/downloader';
+import { createImageInterceptor, downloadGeneratedImage, copyToOutputDir } from '../chatgpt/downloader';
 import { detectError, waitForErrorResolution } from '../chatgpt/errors';
 import { verifyImageFile } from '../download/verifier';
-import { clearDownloadDir, archiveDownloadedImages } from '../download/download-watcher';
+import { resolveMoodboardRefs } from '../prompt/image-name-parser';
 import { makeImageFilename } from '../utils/sanitize';
 import { initGlobalLogger, getLogger } from '../utils/logger';
 import { captureScreenshot } from '../utils/screenshot';
@@ -32,12 +32,13 @@ import { captureScreenshot } from '../utils/screenshot';
  * The main batch orchestrator.
  * Coordinates the entire workflow from setup through completion.
  *
- * Download-based workflow:
- * 1. Submit prompt + reference images to ChatGPT
- * 2. Wait for generation to complete (stop button disappears)
- * 3. Click the download button on the generated image
- * 4. Watch downloaded_images/ directory for the new file
- * 5. Copy to batch folder, display in review/gallery
+ * Workflow:
+ * 1. Attach skill file (+02, select 02-gpt-image-generator.md)
+ * 2. Submit prompt + reference images to ChatGPT
+ * 3. Wait for generation to complete (stop button disappears)
+ * 4. Download the image via network interception or DOM extraction
+ * 5. Save to batch folder AND output dir (SCRIPT_IMAGES or MOODBOARD_IMAGES)
+ * 6. Copy to batch folder, display in review/gallery
  */
 export class BatchOrchestrator extends EventEmitter {
   private config: AppConfig;
@@ -51,6 +52,7 @@ export class BatchOrchestrator extends EventEmitter {
   private referenceImages: ReferenceImage[] = [];
   private isRunning: boolean = false;
   private imagesInCurrentChat: number = 0;
+  private outputDir: string = '';
 
   // Callbacks for UI integration
   private onReviewRequest?: (imagePath: string, promptIndex: number, prompt: string) => void;
@@ -69,6 +71,7 @@ export class BatchOrchestrator extends EventEmitter {
   getBatchPaths(): BatchFolderPaths { return this.batchPaths; }
   getPrompts(): ParsedPrompt[] { return this.prompts; }
   getReferenceImages(): ReferenceImage[] { return this.referenceImages; }
+  getIsRunning(): boolean { return this.isRunning; }
 
   /**
    * Set the review callback for the UI.
@@ -117,6 +120,16 @@ export class BatchOrchestrator extends EventEmitter {
     const logger = getLogger();
     logger.info('orchestrator', `Setting up batch: ${options.batchName} (${batchId})`);
 
+    // Determine output directory based on batch type
+    if (options.outputDir) {
+      this.outputDir = options.outputDir;
+    } else if (options.batchType === 'moodboard') {
+      this.outputDir = this.config.moodboardImagesDir;
+    } else {
+      this.outputDir = this.config.scriptImagesDir;
+    }
+    fs.mkdirSync(this.outputDir, { recursive: true });
+
     // Parse prompts
     let promptText = options.promptsText;
     if (options.promptsFilePath && fs.existsSync(options.promptsFilePath)) {
@@ -158,8 +171,14 @@ export class BatchOrchestrator extends EventEmitter {
       batchId,
       options.batchName,
       this.batchPaths.root,
-      this.prompts.map(p => ({ index: p.index, originalText: p.originalText }))
+      this.prompts.map(p => ({ index: p.index, originalText: p.originalText, imageId: p.imageId }))
     );
+
+    // Set batch type and output dir on the progress
+    this.queue.getPersistence().setProgress({
+      batchType: options.batchType || 'script',
+      outputDir: this.outputDir,
+    });
 
     // Save batch config
     fs.writeFileSync(
@@ -167,9 +186,11 @@ export class BatchOrchestrator extends EventEmitter {
       JSON.stringify({
         batchId,
         batchName: options.batchName,
+        batchType: options.batchType || 'script',
         browserType: options.browserType,
         totalPrompts: this.prompts.length,
         referenceImageCount: this.referenceImages.length,
+        outputDir: this.outputDir,
         createdAt: new Date().toISOString(),
         config: {
           imagesPerChat: this.config.imagesPerChat,
@@ -178,10 +199,7 @@ export class BatchOrchestrator extends EventEmitter {
       }, null, 2)
     );
 
-    // Clear downloaded_images directory for fresh batch
-    clearDownloadDir(this.config.downloadedImagesDir);
-
-    logger.info('orchestrator', `Batch setup complete: ${this.prompts.length} prompts, ${this.referenceImages.length} references`);
+    logger.info('orchestrator', `Batch setup complete: ${this.prompts.length} prompts, ${this.referenceImages.length} references, output: ${this.outputDir}`);
 
     return { batchId, batchFolder: this.batchPaths.root };
   }
@@ -198,6 +216,9 @@ export class BatchOrchestrator extends EventEmitter {
       this.emit('event', event);
     });
     const progress = this.queue.getProgress();
+
+    // Load output directory
+    this.outputDir = progress.outputDir || this.config.scriptImagesDir;
 
     // Load prompts
     const normalizedPath = path.join(batchFolder, 'prompts.normalized.json');
@@ -248,6 +269,51 @@ export class BatchOrchestrator extends EventEmitter {
   }
 
   /**
+   * Smart resume: scan the output directory for already-generated images.
+   * Any prompt whose imageId already has a file in the output dir gets
+   * auto-marked as completed and skipped during processing.
+   */
+  private scanAndSkipExistingImages(): void {
+    const logger = getLogger();
+    if (!this.outputDir || !fs.existsSync(this.outputDir)) return;
+
+    const existingFiles = fs.readdirSync(this.outputDir)
+      .filter(f => /\.(png|jpg|jpeg|webp|gif)$/i.test(f))
+      .map(f => path.parse(f).name.toUpperCase());
+
+    if (existingFiles.length === 0) return;
+
+    let skippedCount = 0;
+    for (const prompt of this.prompts) {
+      if (this.queue.isJobDone(prompt.index)) continue;
+
+      // Determine the expected imageId for this prompt
+      const imageId = prompt.imageId || `IMG-${String(prompt.index).padStart(3, '0')}`;
+      
+      if (existingFiles.includes(imageId.toUpperCase())) {
+        // Mark as completed with the existing file path
+        const existingFile = fs.readdirSync(this.outputDir)
+          .find(f => path.parse(f).name.toUpperCase() === imageId.toUpperCase());
+        
+        if (existingFile) {
+          const fullPath = path.join(this.outputDir, existingFile);
+          this.queue.completeJob(prompt.index, fullPath, existingFile, '');
+          skippedCount++;
+          logger.info('orchestrator', `Smart resume: skipping ${imageId} — already exists at ${fullPath}`);
+        }
+      }
+    }
+
+    if (skippedCount > 0) {
+      logger.info('orchestrator', `Smart resume: skipped ${skippedCount} already-generated image(s)`);
+      this.queue.emitEvent({
+        type: 'progress_update',
+        progress: this.queue.getProgress(),
+      } as any);
+    }
+  }
+
+  /**
    * Check if the browser session is alive and ready.
    */
   isBrowserReady(): boolean {
@@ -280,6 +346,9 @@ export class BatchOrchestrator extends EventEmitter {
       // Ensure browser is launched and ready
       await this.ensureBrowserReady();
 
+      // Smart resume: skip prompts whose images already exist in the output dir
+      this.scanAndSkipExistingImages();
+
       const progress = this.queue.getProgress();
 
       // If style not yet approved, process prompt 1 with approval gate
@@ -293,12 +362,6 @@ export class BatchOrchestrator extends EventEmitter {
       // Mark batch complete
       this.queue.completeBatch();
 
-      // Archive downloaded images to batch folder
-      archiveDownloadedImages(
-        this.config.downloadedImagesDir,
-        path.join(this.batchPaths.root, 'downloaded-archive')
-      );
-
       logger.info('orchestrator', 'Batch processing complete!');
 
     } catch (err) {
@@ -311,16 +374,62 @@ export class BatchOrchestrator extends EventEmitter {
   }
 
   /**
+   * Retry a single failed job — triggered from the UI retry button.
+   * This actually re-generates the image, not just flips the state.
+   */
+  async retryFailedJob(promptIndex: number): Promise<void> {
+    const logger = getLogger();
+
+    if (!this.queue) {
+      throw new Error('No batch loaded');
+    }
+
+    const progress = this.queue.getProgress();
+    const job = progress.jobs.find(j => j.promptIndex === promptIndex);
+    if (!job) {
+      throw new Error(`Job ${promptIndex} not found`);
+    }
+
+    if (job.state !== 'failed' && job.state !== 'cancelled') {
+      throw new Error(`Job ${promptIndex} is not in failed/cancelled state (current: ${job.state})`);
+    }
+
+    // Find the corresponding prompt
+    const prompt = this.prompts.find(p => p.index === promptIndex);
+    if (!prompt) {
+      throw new Error(`Prompt ${promptIndex} not found`);
+    }
+
+    logger.info('orchestrator', `Retrying failed job ${promptIndex}: "${prompt.title}"`);
+
+    // Mark as pending and emit event
+    this.queue.retryJob(promptIndex);
+
+    // Ensure browser is ready
+    await this.ensureBrowserReady();
+
+    const bible = this.styleAnchor.getBible();
+    if (!bible) {
+      throw new Error('Style Bible not available — cannot retry');
+    }
+
+    // Start a new chat for the retry
+    const page = this.session.getPage();
+    await startNewChat(page);
+    await page.waitForTimeout(2000);
+    this.imagesInCurrentChat = 0;
+
+    const chatNumber = this.queue.getChatNumber(promptIndex, this.config.imagesPerChat);
+    this.queue.emitEvent({ type: 'new_chat_started', chatNumber });
+
+    // Process the single prompt as a new-chat first prompt
+    await this.processSinglePrompt(prompt, chatNumber, true, bible);
+
+    logger.info('orchestrator', `Retry of job ${promptIndex} complete`);
+  }
+
+  /**
    * Process the first prompt with the approval gate.
-   *
-   * Workflow:
-   * 1. Start new chat
-   * 2. Upload reference images + type prompt 1
-   * 3. Submit and wait for generation to complete
-   * 4. Click download button, watch downloaded_images/ for new file
-   * 5. Show image in review page, wait for user approval
-   * 6. If rejected: re-attach ALL reference images + revised prompt in SAME chat
-   * 7. If approved: lock style, proceed
    */
   private async processFirstPromptWithApproval(): Promise<void> {
     const logger = getLogger();
@@ -366,9 +475,13 @@ export class BatchOrchestrator extends EventEmitter {
       // Get reference image paths
       const refPaths = getReferenceFilePaths(this.referenceImages);
 
+      // Resolve moodboard image refs if this is a script batch with REFS
+      const moodboardRefPaths = this.resolveMoodboardRefsForPrompt(prompt);
+      const allImagePaths = [...refPaths, ...moodboardRefPaths];
+
       // On rejection, re-attach ALL reference images in the SAME chat
       const preMessageCount = await countAssistantMessages(page);
-      await sendGenerationRequest(page, preparedPrompt, refPaths);
+      await sendGenerationRequest(page, preparedPrompt, allImagePaths, true);
 
       // Wait for generation to complete
       const result = await waitForGeneration(
@@ -411,7 +524,7 @@ export class BatchOrchestrator extends EventEmitter {
       const downloadResult = await downloadGeneratedImage(
         page,
         imagePath,
-        this.config.downloadedImagesDir,
+        '',
         interceptor,
         60_000
       );
@@ -437,6 +550,12 @@ export class BatchOrchestrator extends EventEmitter {
       // Also save to style-anchor folder
       const styleImagePath = path.join(this.batchPaths.styleAnchor, 'approved_image.png');
       fs.copyFileSync(imagePath, styleImagePath);
+
+      // Copy to output directory with proper image ID
+      const imageId = prompt.imageId || `IMG-${String(prompt.index).padStart(3, '0')}`;
+      if (this.outputDir) {
+        copyToOutputDir(imagePath, this.outputDir, imageId);
+      }
 
       this.imagesInCurrentChat++;
 
@@ -510,7 +629,7 @@ export class BatchOrchestrator extends EventEmitter {
         continue;
       }
 
-      // Check if we need a new chat (every 10 images)
+      // Check if we need a new chat (every 30 images)
       const needsNewChat = this.imagesInCurrentChat >= this.config.imagesPerChat;
       const chatNumber = this.queue.getChatNumber(prompt.index, this.config.imagesPerChat);
 
@@ -530,6 +649,16 @@ export class BatchOrchestrator extends EventEmitter {
         await page.waitForTimeout(this.config.delayBetweenPromptsMs);
       }
     }
+  }
+
+  /**
+   * Resolve moodboard image references for a prompt.
+   * Looks at the prompt's refs field (e.g. ['MB-PROP-01', 'MB-ENV-01'])
+   * and resolves them to actual file paths in MOODBOARD_IMAGES.
+   */
+  private resolveMoodboardRefsForPrompt(prompt: ParsedPrompt): string[] {
+    if (!prompt.refs || prompt.refs.length === 0) return [];
+    return resolveMoodboardRefs(prompt.refs, this.config.moodboardImagesDir);
   }
 
   /**
@@ -572,18 +701,22 @@ export class BatchOrchestrator extends EventEmitter {
 
         // Build the prompt
         let preparedPrompt: string;
-        let uploadFiles: string[] = [];
+        let uploadImageFiles: string[] = [];
 
         if (isNewChat) {
           // New chat — upload approved image 1 as reference + style bible instructions
           preparedPrompt = this.promptBuilder.buildNewChatFirstPrompt(prompt.originalText, bible);
-          uploadFiles = [
+          uploadImageFiles = [
             bible.approvedImagePath,
           ].filter(f => fs.existsSync(f));
         } else {
           // Same chat — shorter style reminder
           preparedPrompt = this.promptBuilder.buildSubsequentSameChatPrompt(prompt.originalText, bible);
         }
+
+        // Add moodboard reference images for this prompt
+        const moodboardRefPaths = this.resolveMoodboardRefsForPrompt(prompt);
+        uploadImageFiles = [...uploadImageFiles, ...moodboardRefPaths];
 
         this.queue.updateJobPrompts(prompt.index, preparedPrompt, preparedPrompt);
 
@@ -592,8 +725,8 @@ export class BatchOrchestrator extends EventEmitter {
 
         const preMessageCount = await countAssistantMessages(page);
 
-        // Send the generation request
-        await sendGenerationRequest(page, preparedPrompt, uploadFiles);
+        // Send the generation request (with skill file attachment)
+        await sendGenerationRequest(page, preparedPrompt, uploadImageFiles, true);
 
         // Wait for generation to complete
         const result = await waitForGeneration(
@@ -626,7 +759,7 @@ export class BatchOrchestrator extends EventEmitter {
         const downloadResult = await downloadGeneratedImage(
           page,
           imagePath,
-          this.config.downloadedImagesDir,
+          '',
           interceptor,
           60_000
         );
@@ -639,6 +772,12 @@ export class BatchOrchestrator extends EventEmitter {
         const verification = verifyImageFile(imagePath);
         if (!verification.valid) {
           throw new Error(`Verification failed: ${verification.errors.join(', ')}`);
+        }
+
+        // Copy to output directory with proper image ID
+        const imageId = prompt.imageId || `IMG-${String(prompt.index).padStart(3, '0')}`;
+        if (this.outputDir) {
+          copyToOutputDir(imagePath, this.outputDir, imageId);
         }
 
         this.imagesInCurrentChat++;
@@ -686,14 +825,14 @@ export class BatchOrchestrator extends EventEmitter {
    * Pause the batch.
    */
   pause(): void {
-    this.queue.pause('User paused');
+    if (this.queue) this.queue.pause('User paused');
   }
 
   /**
    * Cancel the batch.
    */
   cancel(): void {
-    this.queue.cancel();
+    if (this.queue) this.queue.cancel();
   }
 
   /**
