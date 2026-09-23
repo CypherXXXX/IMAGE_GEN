@@ -9,9 +9,7 @@
     content="Automated ChatGPT image generation with style consistency, batch processing, and human-in-the-loop approval.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
-    rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/styles.css">
 </head>
 
@@ -646,6 +644,33 @@
             <line x1="12" y1="15" x2="12" y2="3" />
           </svg>Download
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Keyboard Shortcuts Overlay -->
+  <div class="shortcuts-overlay" id="shortcuts-overlay">
+    <div class="shortcuts-card">
+      <h3>Keyboard Shortcuts</h3>
+      <div class="shortcut-row"><span>Navigate to Setup</span><div class="shortcut-keys"><span class="shortcut-key">Ctrl</span><span class="shortcut-key">1</span></div></div>
+      <div class="shortcut-row"><span>Navigate to Review</span><div class="shortcut-keys"><span class="shortcut-key">Ctrl</span><span class="shortcut-key">2</span></div></div>
+      <div class="shortcut-row"><span>Navigate to Queue</span><div class="shortcut-keys"><span class="shortcut-key">Ctrl</span><span class="shortcut-key">3</span></div></div>
+      <div class="shortcut-row"><span>Navigate to Gallery</span><div class="shortcut-keys"><span class="shortcut-key">Ctrl</span><span class="shortcut-key">4</span></div></div>
+      <div class="shortcut-row"><span>Navigate to Moodboard</span><div class="shortcut-keys"><span class="shortcut-key">Ctrl</span><span class="shortcut-key">5</span></div></div>
+      <div class="shortcut-row"><span>Pause / Resume batch</span><div class="shortcut-keys"><span class="shortcut-key">Space</span></div></div>
+      <div class="shortcut-row"><span>Close overlay</span><div class="shortcut-keys"><span class="shortcut-key">Esc</span></div></div>
+      <div class="shortcut-row"><span>Show this help</span><div class="shortcut-keys"><span class="shortcut-key">?</span></div></div>
+    </div>
+  </div>
+
+  <!-- Custom Confirm Modal -->
+  <div class="confirm-overlay" id="confirm-overlay">
+    <div class="confirm-card">
+      <h4 id="confirm-title">Are you sure?</h4>
+      <p id="confirm-message">This action cannot be undone.</p>
+      <div class="confirm-actions">
+        <button class="btn btn-secondary" id="confirm-cancel">Cancel</button>
+        <button class="btn btn-danger" id="confirm-ok">Confirm</button>
       </div>
     </div>
   </div>

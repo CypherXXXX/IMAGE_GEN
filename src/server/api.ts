@@ -262,6 +262,20 @@ export function setupApiRoutes(app: Express, orchestrator: BatchOrchestrator): v
     }
   });
 
+  // ─── Regenerate Job (works on completed, failed, any state) ───
+  app.post('/api/batch/regenerate', async (req: Request, res: Response) => {
+    try {
+      const { promptIndex } = req.body;
+      res.json({ status: 'regenerate_started' });
+      // Run regeneration in background
+      orchestrator.regenerateJob(promptIndex).catch((err) => {
+        console.error(`Regeneration of prompt ${promptIndex} failed:`, err);
+      });
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
   // ─── Skip Job ───
   app.post('/api/batch/skip', (req: Request, res: Response) => {
     try {

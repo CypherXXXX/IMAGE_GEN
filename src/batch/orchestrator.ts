@@ -483,6 +483,10 @@ export class BatchOrchestrator extends EventEmitter {
       const preMessageCount = await countAssistantMessages(page);
       await sendGenerationRequest(page, preparedPrompt, allImagePaths, true);
 
+      // NOW mark interceptor as ready to capture — after prompt submitted,
+      // so reference image upload responses are NOT captured
+      interceptor.markGenerationStarted();
+
       // Wait for generation to complete
       const result = await waitForGeneration(
         page, preMessageCount,
@@ -551,11 +555,7 @@ export class BatchOrchestrator extends EventEmitter {
       const styleImagePath = path.join(this.batchPaths.styleAnchor, 'approved_image.png');
       fs.copyFileSync(imagePath, styleImagePath);
 
-      // Copy to output directory with proper image ID
-      const imageId = prompt.imageId || `IMG-${String(prompt.index).padStart(3, '0')}`;
-      if (this.outputDir) {
-        copyToOutputDir(imagePath, this.outputDir, imageId);
-      }
+      // DO NOT copy to output directory yet — wait for user approval first
 
       this.imagesInCurrentChat++;
 
@@ -568,6 +568,13 @@ export class BatchOrchestrator extends EventEmitter {
 
       if (decision.approved) {
         approved = true;
+
+        // NOW copy to output directory with proper image ID — only after approval
+        const imageId = prompt.imageId || `IMG-${String(prompt.index).padStart(3, '0')}`;
+        if (this.outputDir) {
+          copyToOutputDir(imagePath, this.outputDir, imageId);
+          logger.info('orchestrator', `Saved approved image to output: ${this.outputDir}/${imageId}`);
+        }
 
         // Generate Style Bible
         const bible = generateStyleBible({
@@ -653,12 +660,26 @@ export class BatchOrchestrator extends EventEmitter {
 
   /**
    * Resolve moodboard image references for a prompt.
-   * Looks at the prompt's refs field (e.g. ['MB-PROP-01', 'MB-ENV-01'])
-   * and resolves them to actual file paths in MOODBOARD_IMAGES.
+   * First checks the prompt's pre-parsed refs field.
+   * Falls back to extracting MB-XXX-NN patterns directly from the prompt text
+   * at runtime — handles old parsed data, resumed batches, etc.
    */
   private resolveMoodboardRefsForPrompt(prompt: ParsedPrompt): string[] {
-    if (!prompt.refs || prompt.refs.length === 0) return [];
-    return resolveMoodboardRefs(prompt.refs, this.config.moodboardImagesDir);
+    let refs = prompt.refs;
+
+    // Fallback: extract refs from prompt text at runtime if not pre-parsed
+    if (!refs || refs.length === 0) {
+      const refPattern = /MB-[A-Z]+-\d+/gi;
+      const matches = prompt.originalText.match(refPattern) || [];
+      refs = [...new Set(matches.map(m => m.toUpperCase()))];
+    }
+
+    if (refs.length === 0) return [];
+
+    const logger = getLogger();
+    const resolved = resolveMoodboardRefs(refs, this.config.moodboardImagesDir);
+    logger.info('orchestrator', `Resolved ${resolved.length}/${refs.length} moodboard refs for prompt ${prompt.index}: [${refs.join(', ')}]`);
+    return resolved;
   }
 
   /**
@@ -702,6 +723,7 @@ export class BatchOrchestrator extends EventEmitter {
         // Build the prompt
         let preparedPrompt: string;
         let uploadImageFiles: string[] = [];
+        const batchType = this.queue.getProgress().batchType;
 
         if (isNewChat) {
           // New chat — upload approved image 1 as reference + style bible instructions
@@ -709,14 +731,25 @@ export class BatchOrchestrator extends EventEmitter {
           uploadImageFiles = [
             bible.approvedImagePath,
           ].filter(f => fs.existsSync(f));
+
+          // For moodboard batches: re-attach ALL reference images on first image of new chat
+          if (batchType === 'moodboard') {
+            const refPaths = getReferenceFilePaths(this.referenceImages);
+            uploadImageFiles = [...uploadImageFiles, ...refPaths];
+          }
         } else {
           // Same chat — shorter style reminder
           preparedPrompt = this.promptBuilder.buildSubsequentSameChatPrompt(prompt.originalText, bible);
+          // Same chat: NO image uploads for moodboard batches
+          // (only skill file + prompt, as per user workflow)
         }
 
-        // Add moodboard reference images for this prompt
-        const moodboardRefPaths = this.resolveMoodboardRefsForPrompt(prompt);
-        uploadImageFiles = [...uploadImageFiles, ...moodboardRefPaths];
+        // Add moodboard reference images ONLY for script batches (not moodboard)
+        // Script batches may reference specific moodboard images in their prompts
+        if (batchType !== 'moodboard') {
+          const moodboardRefPaths = this.resolveMoodboardRefsForPrompt(prompt);
+          uploadImageFiles = [...uploadImageFiles, ...moodboardRefPaths];
+        }
 
         this.queue.updateJobPrompts(prompt.index, preparedPrompt, preparedPrompt);
 
@@ -727,6 +760,10 @@ export class BatchOrchestrator extends EventEmitter {
 
         // Send the generation request (with skill file attachment)
         await sendGenerationRequest(page, preparedPrompt, uploadImageFiles, true);
+
+        // NOW mark interceptor as ready to capture — after prompt submitted,
+        // so reference/moodboard image upload responses are NOT captured
+        interceptor.markGenerationStarted();
 
         // Wait for generation to complete
         const result = await waitForGeneration(
@@ -819,6 +856,149 @@ export class BatchOrchestrator extends EventEmitter {
         this.onReviewRequest(imagePath, promptIndex, promptText);
       }
     });
+  }
+
+  /**
+   * Regenerate a specific job — works on completed, failed, or any state.
+   * Opens a new chat, re-attaches the correct files based on batch type,
+   * and replaces the old image in both batch folder and output directory.
+   *
+   * For MOODBOARD batches: reference images + skill file + prompt
+   * For SCRIPT batches: reference images + moodboard refs from prompt + skill file + prompt
+   */
+  async regenerateJob(promptIndex: number): Promise<void> {
+    const logger = getLogger();
+
+    if (!this.queue) {
+      throw new Error('No batch loaded');
+    }
+
+    const progress = this.queue.getProgress();
+    const job = progress.jobs.find(j => j.promptIndex === promptIndex);
+    if (!job) {
+      throw new Error(`Job ${promptIndex} not found`);
+    }
+
+    const prompt = this.prompts.find(p => p.index === promptIndex);
+    if (!prompt) {
+      throw new Error(`Prompt ${promptIndex} not found`);
+    }
+
+    logger.info('orchestrator', `Regenerating job ${promptIndex}: "${prompt.title}" (current state: ${job.state})`);
+
+    // Mark as regenerating
+    this.queue.regenerateJob(promptIndex);
+
+    // Ensure browser is ready
+    await this.ensureBrowserReady();
+
+    const page = this.session.getPage();
+    const bible = this.styleAnchor.getBible();
+
+    // Start a new chat for the regeneration
+    await startNewChat(page);
+    await page.waitForTimeout(2000);
+
+    const batchType = progress.batchType;
+
+    // Build the prompt with full style context (like a new-chat first prompt)
+    let preparedPrompt: string;
+    let uploadImageFiles: string[] = [];
+
+    if (bible) {
+      preparedPrompt = this.promptBuilder.buildNewChatFirstPrompt(prompt.originalText, bible);
+      uploadImageFiles = [bible.approvedImagePath].filter(f => fs.existsSync(f));
+    } else {
+      // No style bible — use first prompt style (moodboard first image)
+      preparedPrompt = this.promptBuilder.buildFirstPrompt(prompt.originalText);
+    }
+
+    if (batchType === 'moodboard') {
+      // Moodboard regeneration: attach reference images + skill file + prompt
+      const refPaths = getReferenceFilePaths(this.referenceImages);
+      uploadImageFiles = [...uploadImageFiles, ...refPaths];
+    } else {
+      // Script regeneration: attach reference images + specific moodboard images + skill file + prompt
+      const refPaths = getReferenceFilePaths(this.referenceImages);
+      uploadImageFiles = [...uploadImageFiles, ...refPaths];
+
+      // Resolve moodboard image references from the prompt
+      const moodboardRefPaths = this.resolveMoodboardRefsForPrompt(prompt);
+      uploadImageFiles = [...uploadImageFiles, ...moodboardRefPaths];
+    }
+
+    // Set up interceptor BEFORE sending request
+    const interceptor = createImageInterceptor(page);
+    const preMessageCount = await countAssistantMessages(page);
+
+    // Send the generation request
+    await sendGenerationRequest(page, preparedPrompt, uploadImageFiles, true);
+
+    // Mark interceptor as ready to capture
+    interceptor.markGenerationStarted();
+
+    // Wait for generation to complete
+    const result = await waitForGeneration(
+      page, preMessageCount,
+      this.config.generationTimeoutMs,
+      this.config.pollIntervalMs,
+      this.batchPaths.screenshots
+    );
+
+    if (!result.completed) {
+      interceptor.dispose();
+      this.queue.failJob(promptIndex, result.error || 'Generation failed during regeneration');
+      throw new Error(`Regeneration failed: ${result.error}`);
+    }
+
+    // Download the generated image
+    const imageFilename = makeImageFilename(prompt.index, prompt.title);
+    const imagePath = path.join(this.batchPaths.images, imageFilename);
+
+    // Delete old image file if it exists
+    if (job.imagePath && fs.existsSync(job.imagePath)) {
+      try { fs.unlinkSync(job.imagePath); } catch { /* ignore */ }
+    }
+
+    const downloadResult = await downloadGeneratedImage(
+      page,
+      imagePath,
+      '',
+      interceptor,
+      60_000
+    );
+
+    if (!downloadResult.success) {
+      this.queue.failJob(promptIndex, `Download failed: ${downloadResult.error}`);
+      throw new Error(`Regeneration download failed: ${downloadResult.error}`);
+    }
+
+    // Verify the image
+    const verification = verifyImageFile(imagePath);
+    if (!verification.valid) {
+      this.queue.failJob(promptIndex, `Verification failed: ${verification.errors.join(', ')}`);
+      throw new Error(`Regeneration verification failed: ${verification.errors.join(', ')}`);
+    }
+
+    // Replace in output directory with proper image ID
+    const imageId = prompt.imageId || `IMG-${String(prompt.index).padStart(3, '0')}`;
+    if (this.outputDir) {
+      // Delete old output file if it exists
+      const oldExt = job.imagePath ? path.extname(job.imagePath) : '.png';
+      const oldOutputPath = path.join(this.outputDir, `${imageId}${oldExt}`);
+      if (fs.existsSync(oldOutputPath)) {
+        try { fs.unlinkSync(oldOutputPath); } catch { /* ignore */ }
+      }
+      copyToOutputDir(imagePath, this.outputDir, imageId);
+      logger.info('orchestrator', `Regenerated image replaced in output: ${this.outputDir}/${imageId}`);
+    }
+
+    // Mark job as completed with the new image
+    this.queue.completeJob(promptIndex, imagePath, imageFilename, '');
+    logger.info('orchestrator', `✅ Job ${promptIndex} regenerated successfully: ${imageFilename}`);
+
+    // Emit progress update
+    this.queue.emitEvent({ type: 'progress_update', progress: this.queue.getProgress() });
   }
 
   /**

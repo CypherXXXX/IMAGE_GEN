@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "codebase-memory-mcp": {
+      "command": "C:\\Users\\ankit\\AppData\\Local\\Programs\\codebase-memory-mcp\\codebase-memory-mcp.exe"
+    },
+    "graft": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@nanonets/graft",
+        "mcp"
+      ]
+    }
+  }
+}

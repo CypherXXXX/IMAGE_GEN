@@ -201,6 +201,29 @@ export class QueueManager extends EventEmitter {
   }
 
   /**
+   * Regenerate a specific job — works on any state (completed, failed, etc.).
+   * Resets the job to 'generating' state for re-generation.
+   */
+  regenerateJob(promptIndex: number): boolean {
+    const job = this.persistence.getJob(promptIndex);
+    if (!job) return false;
+
+    this.persistence.updateJob(promptIndex, {
+      state: 'generating',
+      error: '',
+      imagePath: '',
+      imageFilename: '',
+      imageUrl: '',
+      retryCount: job.retryCount + 1,
+      startedAt: new Date().toISOString(),
+      completedAt: '',
+      downloadVerified: false,
+    });
+    this.emitEvent({ type: 'job_started', promptIndex });
+    return true;
+  }
+
+  /**
    * Mark batch complete.
    */
   completeBatch(): void {

@@ -38,6 +38,7 @@ interface InterceptedImage {
   url: string;
   contentType: string;
   buffer: Buffer | null;
+  capturedAt: number;
 }
 
 /**
@@ -45,20 +46,38 @@ interface InterceptedImage {
  * and optionally their binary data as they stream in.
  *
  * Call this BEFORE submitting the generation prompt.
- * Returns a handle with .getResult() and .dispose().
+ * Returns a handle with .getResult(), .markGenerationStarted(), and .dispose().
+ *
+ * IMPORTANT: The interceptor uses a two-phase approach to avoid capturing
+ * uploaded reference images (which also come through estuary/content endpoints):
+ *
+ * Phase 1 (before markGenerationStarted): All image responses are IGNORED.
+ *          This covers the time when reference images are being uploaded and
+ *          their previews are loading.
+ *
+ * Phase 2 (after markGenerationStarted): Image responses are captured.
+ *          This is called by sendGenerationRequest AFTER the prompt is submitted,
+ *          ensuring we only capture the actual DALL-E generated output.
  */
 export function createImageInterceptor(page: Page): {
   getResult: () => InterceptedImage | null;
+  markGenerationStarted: () => void;
   dispose: () => void;
 } {
   const logger = getLogger();
   let captured: InterceptedImage | null = null;
+  let generationStarted = false;
 
   const handler = async (response: PlaywrightResponse) => {
     try {
       const url = response.url();
       const status = response.status();
       const contentType = response.headers()['content-type'] || '';
+
+      // ── PHASE GATE: Only capture after generation has started ──
+      // Before the prompt is submitted, any image responses are reference
+      // image previews, upload thumbnails, or existing chat images.
+      if (!generationStarted) return;
 
       // ── STRICT FILTERING — only capture actual DALL-E generated images ──
 
@@ -99,8 +118,9 @@ export function createImageInterceptor(page: Page): {
       let buffer: Buffer | null = null;
       try {
         buffer = await response.body();
-        // Generated images are typically 100KB+ — skip small thumbnails
-        if (buffer.length < 20_000) {
+        // Generated images are typically 100KB+ — skip small images
+        // (thumbnails, preview versions of uploaded references)
+        if (buffer.length < 50_000) {
           logger.debug('interceptor', `Skipping small image (${buffer.length} bytes): ${url.substring(0, 80)}`);
           return;
         }
@@ -111,7 +131,7 @@ export function createImageInterceptor(page: Page): {
       logger.info('interceptor', `✅ Captured generated image: ${url.substring(0, 120)} [${contentType}, ${buffer ? buffer.length + ' bytes' : 'no body'}]`);
 
       // Always keep the LATEST capture (last image response = the generated one)
-      captured = { url, contentType, buffer };
+      captured = { url, contentType, buffer, capturedAt: Date.now() };
 
     } catch { /* ignore transient errors */ }
   };
@@ -120,6 +140,10 @@ export function createImageInterceptor(page: Page): {
 
   return {
     getResult: () => captured,
+    markGenerationStarted: () => {
+      generationStarted = true;
+      logger.debug('interceptor', 'Generation started — now capturing image responses');
+    },
     dispose: () => {
       page.off('response', handler);
     },

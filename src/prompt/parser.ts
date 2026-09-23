@@ -3,6 +3,20 @@ import { extractPromptTitle } from '../utils/sanitize';
 import { getLogger } from '../utils/logger';
 
 /**
+ * Extract all moodboard image references (MB-XXX-NN) from prompt text.
+ * Matches patterns like: (MB-CHAR-01, MB-PROP-06, MB-ENV-01)
+ * or standalone MB-CHAR-01 mentions anywhere in the text.
+ * Returns deduplicated, uppercase refs.
+ */
+function extractMoodboardRefs(text: string): string[] {
+  const refPattern = /MB-[A-Z]+-\d+/gi;
+  const matches = text.match(refPattern) || [];
+  // Deduplicate and uppercase
+  const unique = [...new Set(matches.map(m => m.toUpperCase()))];
+  return unique;
+}
+
+/**
  * Parse a prompt document into individual prompts.
  *
  * Supports multiple delimiter styles:
@@ -63,11 +77,15 @@ function parseByHeaders(text: string): ParsedPrompt[] {
       imageId = mbMatch[0].replace(/[()]/g, '').toUpperCase();
     }
 
+    // Extract all moodboard refs from the prompt body
+    const refs = extractMoodboardRefs(body);
+
     prompts.push({
       index,
       title: extractPromptTitle(body),
       originalText: body,
       imageId,
+      refs: refs.length > 0 ? refs : undefined,
     });
   }
 
@@ -96,6 +114,7 @@ function parseBySeparators(text: string, separator: RegExp): ParsedPrompt[] {
       index: prompts.length + 1,
       title: extractPromptTitle(cleaned),
       originalText: cleaned,
+      refs: extractMoodboardRefs(cleaned).length > 0 ? extractMoodboardRefs(cleaned) : undefined,
     });
   }
 
@@ -120,6 +139,7 @@ function parseByNumbered(text: string): ParsedPrompt[] {
           index: prompts.length + 1,
           title: extractPromptTitle(currentPrompt),
           originalText: currentPrompt.trim(),
+          refs: extractMoodboardRefs(currentPrompt).length > 0 ? extractMoodboardRefs(currentPrompt) : undefined,
         });
       }
       currentPrompt = match[2];
@@ -134,6 +154,7 @@ function parseByNumbered(text: string): ParsedPrompt[] {
       index: prompts.length + 1,
       title: extractPromptTitle(currentPrompt),
       originalText: currentPrompt.trim(),
+      refs: extractMoodboardRefs(currentPrompt).length > 0 ? extractMoodboardRefs(currentPrompt) : undefined,
     });
   }
 
@@ -153,6 +174,7 @@ function parseByDoubleNewline(text: string): ParsedPrompt[] {
       index: i + 1,
       title: extractPromptTitle(sections[i]),
       originalText: sections[i],
+      refs: extractMoodboardRefs(sections[i]).length > 0 ? extractMoodboardRefs(sections[i]) : undefined,
     });
   }
 

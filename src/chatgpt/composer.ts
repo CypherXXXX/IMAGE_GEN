@@ -4,11 +4,64 @@ import { getLogger } from '../utils/logger';
 import path from 'path';
 
 /**
+ * Paste text into the page using the clipboard.
+ * This is ATOMIC — the entire text appears at once, unlike keyboard.type()
+ * which types character-by-character and is fragile with ProseMirror.
+ */
+async function clipboardPaste(page: Page, text: string): Promise<boolean> {
+  const logger = getLogger();
+  try {
+    // Set clipboard content via the browser context and paste with Ctrl+V
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval
+    await page.evaluate(`
+      (async () => {
+        await navigator.clipboard.writeText(${JSON.stringify(text)});
+      })()
+    `);
+    await page.keyboard.press('Control+v');
+    await page.waitForTimeout(600);
+    logger.debug('composer', `Clipboard paste successful (${text.length} chars)`);
+    return true;
+  } catch (err) {
+    logger.debug('composer', `Clipboard paste via navigator failed: ${err}, trying synthetic paste`);
+  }
+
+  // Fallback: use a synthetic ClipboardEvent to paste
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval
+    await page.evaluate(`
+      (() => {
+        const el = document.querySelector('#prompt-textarea');
+        if (!el) return;
+        el.focus();
+        const clipboardData = new DataTransfer();
+        clipboardData.setData('text/plain', ${JSON.stringify(text)});
+        const pasteEvent = new ClipboardEvent('paste', {
+          bubbles: true,
+          cancelable: true,
+          clipboardData: clipboardData,
+        });
+        el.dispatchEvent(pasteEvent);
+      })()
+    `);
+    await page.waitForTimeout(600);
+    logger.debug('composer', 'Clipboard paste via synthetic event successful');
+    return true;
+  } catch (err) {
+    logger.debug('composer', `Synthetic paste also failed: ${err}`);
+    return false;
+  }
+}
+
+/**
  * Type text into the ChatGPT composer (ProseMirror editor).
+ * 
+ * IMPORTANT: Uses clipboard paste (atomic) instead of keyboard.type()
+ * to avoid half-pasted prompts and accidental early submission.
  */
 export async function typeInComposer(page: Page, text: string, append: boolean = false): Promise<void> {
   const logger = getLogger();
-  logger.debug('composer', `Typing ${text.length} chars into composer (append: ${append})`);
+  logger.debug('composer', `Entering ${text.length} chars into composer (append: ${append})`);
 
   const textarea = page.locator(SELECTORS.COMPOSER.TEXTAREA);
 
@@ -25,7 +78,7 @@ export async function typeInComposer(page: Page, text: string, append: boolean =
     await page.keyboard.press('Backspace');
     await page.waitForTimeout(300);
 
-    // Try fill() first — Playwright has special ProseMirror support
+    // Strategy 1: Try fill() first — Playwright has special ProseMirror support
     try {
       await textarea.fill(text);
       await page.waitForTimeout(500);
@@ -35,7 +88,14 @@ export async function typeInComposer(page: Page, text: string, append: boolean =
       logger.debug('composer', `fill() failed: ${err}, falling back to clipboard paste`);
     }
 
-    // Fallback: use direct DOM manipulation in browser context
+    // Strategy 2: Clipboard paste (atomic, instant)
+    const pasted = await clipboardPaste(page, text);
+    if (pasted) {
+      logger.debug('composer', 'Text entered via clipboard paste');
+      return;
+    }
+
+    // Strategy 3: DOM manipulation
     try {
       // eslint-disable-next-line @typescript-eslint/no-implied-eval
       await page.evaluate(`
@@ -60,12 +120,20 @@ export async function typeInComposer(page: Page, text: string, append: boolean =
     await page.waitForTimeout(500);
     logger.debug('composer', 'Text entered via keyboard type');
   } else {
-    // Append mode: move cursor to end, then type
+    // Append mode: move cursor to end, then paste
     await page.keyboard.press('End');
     await page.keyboard.press('Control+End');
     await page.waitForTimeout(200);
 
-    // Use keyboard type for appending — reliable and doesn't overwrite
+    // Strategy 1: Clipboard paste (atomic — entire text appears at once)
+    const pasted = await clipboardPaste(page, text);
+    if (pasted) {
+      logger.debug('composer', 'Text appended via clipboard paste');
+      return;
+    }
+
+    // Strategy 2: Fallback to keyboard.type only if clipboard fails
+    logger.warn('composer', 'Clipboard paste failed in append mode, falling back to keyboard.type');
     await page.keyboard.type(text, { delay: 3 });
     await page.waitForTimeout(500);
     logger.debug('composer', 'Text appended via keyboard type');
@@ -98,8 +166,17 @@ export async function uploadFiles(page: Page, filePaths: string[]): Promise<void
     if (inputCount > 0) {
       logger.debug('composer', 'Found hidden file input, using setInputFiles');
       await page.locator('input[type="file"]').first().setInputFiles(absolutePaths);
-      await page.waitForTimeout(2000); // Wait for upload processing
-      logger.info('composer', 'Files uploaded via hidden input');
+      // Wait for upload processing — longer for multiple large images
+      const waitTime = Math.max(3000, filePaths.length * 2000);
+      await page.waitForTimeout(waitTime);
+
+      // Verify thumbnails appeared in the composer
+      const verified = await waitForUploadThumbnails(page, filePaths.length, 15_000);
+      if (verified) {
+        logger.info('composer', `Files uploaded via hidden input — ${filePaths.length} thumbnail(s) confirmed`);
+      } else {
+        logger.warn('composer', 'Files uploaded via hidden input — thumbnails not confirmed, continuing anyway');
+      }
       return;
     }
   } catch (err) {
@@ -117,7 +194,9 @@ export async function uploadFiles(page: Page, filePaths: string[]): Promise<void
     ]);
 
     await fileChooser.setFiles(absolutePaths);
-    await page.waitForTimeout(2000);
+    const waitTime = Math.max(3000, filePaths.length * 2000);
+    await page.waitForTimeout(waitTime);
+    await waitForUploadThumbnails(page, filePaths.length, 15_000);
     logger.info('composer', 'Files uploaded via file chooser');
     return;
   } catch (err) {
@@ -138,7 +217,9 @@ export async function uploadFiles(page: Page, filePaths: string[]): Promise<void
         uploadItem.click(),
       ]);
       await fileChooser.setFiles(absolutePaths);
-      await page.waitForTimeout(2000);
+      const waitTime = Math.max(3000, filePaths.length * 2000);
+      await page.waitForTimeout(waitTime);
+      await waitForUploadThumbnails(page, filePaths.length, 15_000);
       logger.info('composer', 'Files uploaded via menu item');
       return;
     }
@@ -147,6 +228,66 @@ export async function uploadFiles(page: Page, filePaths: string[]): Promise<void
   }
 
   throw new Error('Could not upload files — all strategies failed');
+}
+
+/**
+ * Wait for file upload thumbnails to appear in the composer area.
+ * Polls the DOM for image preview chips/thumbnails that ChatGPT
+ * renders after files are attached.
+ */
+async function waitForUploadThumbnails(page: Page, expectedCount: number, timeoutMs: number = 15000): Promise<boolean> {
+  const logger = getLogger();
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < timeoutMs) {
+    try {
+      // ChatGPT renders uploaded file previews as img elements or divs
+      // inside the composer area — check for file attachment indicators
+      const thumbnailCount: number = await page.evaluate(`
+        (() => {
+          // Strategy 1: Count image thumbnails near the composer
+          const composerArea = document.querySelector('#prompt-textarea');
+          if (!composerArea) return 0;
+          const parent = composerArea.closest('form') || composerArea.parentElement?.parentElement?.parentElement;
+          if (!parent) return 0;
+
+          // Look for file attachment chips/thumbnails
+          const attachments = parent.querySelectorAll('img[src]:not([src=""]), [data-testid*="file"], [data-testid*="attachment"], [class*="attachment"], [class*="file-thumbnail"]');
+          // Also look for any image preview containers
+          const previews = parent.querySelectorAll('[class*="preview"] img, [class*="upload"] img, [role="img"]');
+          return Math.max(attachments.length, previews.length);
+        })()
+      `) as number;
+
+      if (thumbnailCount >= expectedCount) {
+        logger.debug('composer', `Upload thumbnails confirmed: ${thumbnailCount} found (expected ${expectedCount})`);
+        return true;
+      }
+
+      // Also check for any loading spinners that indicate upload in progress
+      const hasLoadingIndicator: boolean = await page.evaluate(`
+        (() => {
+          const composerArea = document.querySelector('#prompt-textarea');
+          if (!composerArea) return false;
+          const parent = composerArea.closest('form') || composerArea.parentElement?.parentElement?.parentElement;
+          if (!parent) return false;
+          const spinners = parent.querySelectorAll('[class*="spinner"], [class*="loading"], [role="progressbar"]');
+          return spinners.length > 0;
+        })()
+      `) as boolean;
+
+      if (hasLoadingIndicator) {
+        logger.debug('composer', 'Upload still in progress (loading indicator visible)...');
+      }
+    } catch {
+      // DOM access failed, just keep polling
+    }
+
+    await page.waitForTimeout(500);
+  }
+
+  logger.warn('composer', `Upload thumbnail verification timed out after ${timeoutMs}ms (expected ${expectedCount} thumbnails)`);
+  return false;
 }
 
 /**
@@ -303,8 +444,14 @@ export async function attachSkillFile(page: Page): Promise<void> {
   await page.keyboard.press('Shift+Enter');
   await page.waitForTimeout(300);
 
-  // 3. Type the instruction to read the skill file
-  await page.keyboard.type('Read extensively the skill file then generate the image', { delay: 10 });
+  // 3. Paste the instruction text via clipboard (atomic, not character-by-character)
+  const instructionText = 'Read extensively the skill file then generate the image';
+  const pasted = await clipboardPaste(page, instructionText);
+  if (!pasted) {
+    // Fallback to keyboard.type only if clipboard fails
+    logger.warn('composer', 'Clipboard paste failed for skill instruction, falling back to type');
+    await page.keyboard.type(instructionText, { delay: 10 });
+  }
   await page.waitForTimeout(300);
 
   // 4. Hit Shift+Enter twice more to create space before the prompt
@@ -320,7 +467,12 @@ export async function attachSkillFile(page: Page): Promise<void> {
  * Upload files AND type prompt, then submit.
  * This is the main entry point for sending a generation request.
  * 
- * Flow: attach skill file → upload images → type/append prompt → submit
+ * IMPORTANT: Upload images AFTER typing the prompt text, not before.
+ * ChatGPT's ProseMirror editor can drop file attachment chips when
+ * the composer content is manipulated via fill()/paste/DOM.
+ * By typing first, then uploading, the file chips stay anchored.
+ *
+ * Flow: attach skill file → type/append prompt → upload images → submit
  */
 export async function sendGenerationRequest(
   page: Page,
@@ -336,18 +488,20 @@ export async function sendGenerationRequest(
     await page.waitForTimeout(500);
   }
 
-  // Step 2: Upload images (if any)
-  if (imageFiles.length > 0) {
-    await uploadFiles(page, imageFiles);
-    // Wait for uploads to process and appear in composer
-    await page.waitForTimeout(3000);
-  }
-
-  // Step 3: Type the prompt
+  // Step 2: Type/paste the prompt text FIRST
   // If skill file was attached, append the prompt (don't clear the composer)
   // Otherwise, type it fresh
   await typeInComposer(page, promptText, useSkillFile);
   await page.waitForTimeout(500);
+
+  // Step 3: Upload images AFTER the prompt text is entered
+  // This prevents ProseMirror from dropping file attachment chips
+  // during text manipulation (fill, paste, DOM changes)
+  if (imageFiles.length > 0) {
+    await uploadFiles(page, imageFiles);
+    // Extra stabilization wait after uploads
+    await page.waitForTimeout(1500);
+  }
 
   // Step 4: Submit
   await submitPrompt(page);

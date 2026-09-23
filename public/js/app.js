@@ -630,18 +630,28 @@ function updateJobState(promptIndex, state) {
     pillEl.className = 'pill job-pill ' + getJobPillClass(state);
     pillEl.innerHTML = getJobPillContent(state);
   }
-  const actionsEl = row.querySelector('.job-actions');
-  if (state === 'failed' && !actionsEl) {
-    const actions = document.createElement('div');
-    actions.className = 'job-actions';
-    actions.style.opacity = '1';
-    actions.innerHTML = `
-      <button class="btn btn-ghost btn-sm" onclick="retryJob(${promptIndex})">Retry</button>
-      <button class="btn btn-ghost btn-sm" onclick="skipJob(${promptIndex})">Skip</button>
-    `;
-    row.appendChild(actions);
-  } else if (state !== 'failed' && actionsEl) {
-    actionsEl.remove();
+  // Update action buttons based on state
+  let actionsEl = row.querySelector('.job-actions');
+  if (state === 'failed' || state === 'completed') {
+    if (!actionsEl) {
+      actionsEl = document.createElement('div');
+      actionsEl.className = 'job-actions';
+      actionsEl.style.opacity = '1';
+      row.appendChild(actionsEl);
+    }
+    if (state === 'failed') {
+      actionsEl.innerHTML = `
+        <button class="btn btn-ghost btn-sm" onclick="retryJob(${promptIndex})">Retry</button>
+        <button class="btn btn-ghost btn-sm btn-regen" onclick="regenerateJob(${promptIndex})">Regenerate</button>
+        <button class="btn btn-ghost btn-sm" onclick="skipJob(${promptIndex})">Skip</button>
+      `;
+    } else {
+      actionsEl.innerHTML = `
+        <button class="btn btn-ghost btn-sm btn-regen" onclick="regenerateJob(${promptIndex})">⟳ Regenerate</button>
+      `;
+    }
+  } else if (state === 'generating') {
+    if (actionsEl) actionsEl.remove();
   }
 }
 
@@ -651,15 +661,18 @@ function renderJobList(jobs) {
     const isActive = job.state === 'generating';
     const imageId = job.imageId || `IMG-${String(job.promptIndex).padStart(3, '0')}`;
     const name = job.originalPrompt ? job.originalPrompt.substring(0, 40) : `Prompt ${job.promptIndex}`;
+    const showRegen = job.state === 'completed' || job.state === 'failed';
+    const showRetrySkip = job.state === 'failed';
     return `
       <div class="job-row${isActive ? ' active' : ''}" data-job-index="${job.promptIndex}">
         <span class="job-idx">${esc(imageId)}</span>
         <span class="job-name">${esc(name)}</span>
         <span class="pill job-pill ${getJobPillClass(job.state)}">${getJobPillContent(job.state)}</span>
-        ${job.state === 'failed' ? `
+        ${showRegen || showRetrySkip ? `
           <div class="job-actions" style="opacity:1;">
-            <button class="btn btn-ghost btn-sm" onclick="retryJob(${job.promptIndex})">Retry</button>
-            <button class="btn btn-ghost btn-sm" onclick="skipJob(${job.promptIndex})">Skip</button>
+            ${showRetrySkip ? `<button class="btn btn-ghost btn-sm" onclick="retryJob(${job.promptIndex})">Retry</button>` : ''}
+            ${showRegen ? `<button class="btn btn-ghost btn-sm btn-regen" onclick="regenerateJob(${job.promptIndex})">⟳ Regenerate</button>` : ''}
+            ${showRetrySkip ? `<button class="btn btn-ghost btn-sm" onclick="skipJob(${job.promptIndex})">Skip</button>` : ''}
           </div>
         ` : ''}
       </div>
@@ -706,6 +719,22 @@ async function retryJob(promptIndex) {
     updateJobState(promptIndex, 'generating');
   } catch (err) {
     showToast(`Retry failed: ${err.message}`, 'error');
+  }
+}
+
+async function regenerateJob(promptIndex) {
+  try {
+    const res = await fetch('/api/batch/regenerate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ promptIndex }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    showToast(`Regenerating image ${promptIndex} — opening new chat with full context…`, 'info');
+    updateJobState(promptIndex, 'generating');
+  } catch (err) {
+    showToast(`Regenerate failed: ${err.message}`, 'error');
   }
 }
 
@@ -924,12 +953,44 @@ function updateLightboxImage() {
   document.getElementById('lightbox-img').src = img.url;
   // Show proper imageId (MB-CHAR-01 for moodboard, IMG-001 for script)
   document.getElementById('lightbox-info').textContent = `${img.imageId}`;
+
+  // Show/hide regenerate button in lightbox
+  let regenBtn = document.getElementById('lightbox-regenerate');
+  if (!regenBtn) {
+    // Create the regenerate button dynamically if not in HTML
+    regenBtn = document.createElement('button');
+    regenBtn.id = 'lightbox-regenerate';
+    regenBtn.className = 'btn btn-ghost btn-regen';
+    regenBtn.innerHTML = '⟳ Regenerate';
+    regenBtn.style.cssText = 'margin-left:8px; color:#f59e0b; border-color:#f59e0b;';
+    regenBtn.addEventListener('click', regenerateLightboxImage);
+    const controls = document.querySelector('.lightbox-controls');
+    if (controls) controls.appendChild(regenBtn);
+  }
 }
 
 function downloadLightboxImage() {
   const img = lightboxImages[lightboxIndex];
   if (!img || !img.filename) return;
   downloadBatchImage(lightboxBatchName, img.filename);
+}
+
+async function regenerateLightboxImage() {
+  const img = lightboxImages[lightboxIndex];
+  if (!img) return;
+  try {
+    const res = await fetch('/api/batch/regenerate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ promptIndex: img.index }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    showToast(`Regenerating ${img.imageId} — opening new chat…`, 'info');
+    closeLightbox();
+  } catch (err) {
+    showToast(`Regenerate failed: ${err.message}`, 'error');
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -1089,3 +1150,236 @@ function esc(str) {
   if (!str) return '';
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
+
+// ═══════════════════════════════════════════
+// Keyboard Shortcuts
+// ═══════════════════════════════════════════
+const pageShortcuts = ['setup', 'review', 'queue', 'gallery', 'moodboard'];
+
+document.addEventListener('keydown', (e) => {
+  // Don't trigger shortcuts when typing in inputs/textareas
+  const tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+  // ? — Toggle shortcuts overlay
+  if (e.key === '?' && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault();
+    toggleShortcutsOverlay();
+    return;
+  }
+
+  // Escape — Close overlays
+  if (e.key === 'Escape') {
+    closeShortcutsOverlay();
+    closeConfirmModal();
+    return;
+  }
+
+  // Ctrl+1-5 — Navigate pages
+  if (e.ctrlKey && e.key >= '1' && e.key <= '5') {
+    e.preventDefault();
+    const idx = parseInt(e.key) - 1;
+    if (pageShortcuts[idx]) showPage(pageShortcuts[idx]);
+    return;
+  }
+
+  // Space — Pause/Resume batch (only on queue page)
+  if (e.key === ' ' && currentPage === 'queue' && !e.ctrlKey) {
+    e.preventDefault();
+    if (batchRunning) {
+      document.getElementById('btn-pause').click();
+    } else {
+      document.getElementById('btn-resume').click();
+    }
+    return;
+  }
+});
+
+function toggleShortcutsOverlay() {
+  const overlay = document.getElementById('shortcuts-overlay');
+  overlay.classList.toggle('open');
+}
+
+function closeShortcutsOverlay() {
+  document.getElementById('shortcuts-overlay')?.classList.remove('open');
+}
+
+// Close shortcuts overlay when clicking outside the card
+document.getElementById('shortcuts-overlay')?.addEventListener('click', (e) => {
+  if (e.target.id === 'shortcuts-overlay') closeShortcutsOverlay();
+});
+
+// ═══════════════════════════════════════════
+// Custom Confirm Modal (replaces browser confirm)
+// ═══════════════════════════════════════════
+let confirmResolve = null;
+
+function showConfirm(title, message) {
+  return new Promise((resolve) => {
+    confirmResolve = resolve;
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-message').textContent = message;
+    document.getElementById('confirm-overlay').classList.add('open');
+  });
+}
+
+function closeConfirmModal() {
+  document.getElementById('confirm-overlay')?.classList.remove('open');
+  if (confirmResolve) {
+    confirmResolve(false);
+    confirmResolve = null;
+  }
+}
+
+document.getElementById('confirm-ok')?.addEventListener('click', () => {
+  document.getElementById('confirm-overlay').classList.remove('open');
+  if (confirmResolve) {
+    confirmResolve(true);
+    confirmResolve = null;
+  }
+});
+
+document.getElementById('confirm-cancel')?.addEventListener('click', () => {
+  closeConfirmModal();
+});
+
+document.getElementById('confirm-overlay')?.addEventListener('click', (e) => {
+  if (e.target.id === 'confirm-overlay') closeConfirmModal();
+});
+
+// Override the cancel button to use custom confirm
+(function overrideCancelButton() {
+  const cancelBtn = document.getElementById('btn-cancel');
+  if (!cancelBtn) return;
+
+  // Remove old listeners by cloning
+  const newBtn = cancelBtn.cloneNode(true);
+  cancelBtn.parentNode.replaceChild(newBtn, cancelBtn);
+
+  newBtn.addEventListener('click', async () => {
+    const confirmed = await showConfirm(
+      'Cancel Batch',
+      'Are you sure you want to cancel the current batch? This will stop all pending generations.'
+    );
+    if (confirmed) {
+      await fetch('/api/batch/cancel', { method: 'POST' });
+      batchRunning = false;
+      updateQueueControls();
+    }
+  });
+})();
+
+// ═══════════════════════════════════════════
+// Batch Elapsed Timer
+// ═══════════════════════════════════════════
+let batchStartTime = null;
+let timerInterval = null;
+
+function startBatchTimer() {
+  batchStartTime = Date.now();
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(updateTimerDisplay, 1000);
+  updateTimerDisplay();
+}
+
+function stopBatchTimer() {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+}
+
+function updateTimerDisplay() {
+  if (!batchStartTime) return;
+  const elapsed = Date.now() - batchStartTime;
+  const secs = Math.floor(elapsed / 1000) % 60;
+  const mins = Math.floor(elapsed / 60000) % 60;
+  const hrs = Math.floor(elapsed / 3600000);
+
+  let timeStr = '';
+  if (hrs > 0) timeStr = `${hrs}h ${String(mins).padStart(2, '0')}m`;
+  else if (mins > 0) timeStr = `${mins}m ${String(secs).padStart(2, '0')}s`;
+  else timeStr = `${secs}s`;
+
+  // Update timer display in progress area if it exists
+  let timerEl = document.getElementById('batch-timer');
+  if (!timerEl) {
+    const progressRow = document.querySelector('.progress-top-row');
+    if (progressRow) {
+      timerEl = document.createElement('span');
+      timerEl.id = 'batch-timer';
+      timerEl.className = 'batch-timer';
+      timerEl.innerHTML = `<svg class="timer-icon" viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg><span></span>`;
+      progressRow.appendChild(timerEl);
+    }
+  }
+  if (timerEl) {
+    const span = timerEl.querySelector('span:last-child');
+    if (span) span.textContent = timeStr;
+  }
+}
+
+// Hook into batch events for timer
+const origHandleEvent = handleEvent;
+handleEvent = function(event) {
+  // Start timer on batch start
+  if (event.type === 'batch_started') startBatchTimer();
+  // Stop timer on batch complete/cancel
+  if (event.type === 'batch_completed' || event.type === 'batch_cancelled') stopBatchTimer();
+
+  // Auto-scroll queue job list when new job starts
+  if (event.type === 'job_started') {
+    setTimeout(() => {
+      const activeRow = document.querySelector('.job-row.active');
+      if (activeRow) activeRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 200);
+  }
+
+  // Call original handler
+  origHandleEvent(event);
+};
+
+// ═══════════════════════════════════════════
+// Scroll Animations (IntersectionObserver)
+// ═══════════════════════════════════════════
+function setupScrollAnimations() {
+  // Add animate-on-scroll class to panels
+  document.querySelectorAll('.panel').forEach((panel, i) => {
+    panel.classList.add('animate-on-scroll');
+    panel.style.transitionDelay = `${i * 50}ms`;
+  });
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+  document.querySelectorAll('.animate-on-scroll').forEach(el => observer.observe(el));
+}
+
+// Run after a slight delay to let page render
+setTimeout(setupScrollAnimations, 300);
+
+// Re-run scroll animations when page changes
+const origShowPage = showPage;
+showPage = function(name) {
+  origShowPage(name);
+  // Re-animate panels on the new page
+  setTimeout(() => {
+    const activePage = document.querySelector('.page.active');
+    if (activePage) {
+      activePage.querySelectorAll('.panel').forEach((panel, i) => {
+        panel.classList.remove('animate-on-scroll', 'visible');
+        // Force reflow
+        void panel.offsetWidth;
+        panel.classList.add('animate-on-scroll');
+        panel.style.transitionDelay = `${i * 60}ms`;
+        setTimeout(() => panel.classList.add('visible'), 30);
+      });
+    }
+  }, 50);
+};
